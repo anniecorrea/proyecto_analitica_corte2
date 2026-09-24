@@ -64,6 +64,24 @@ C:\Users\TU_USUARIO\Documents\proyectos\proyecto_analitica_corte2
 
 Despues de clonar, la carpeta `data_mha/` debe quedar dentro de la raiz del repositorio, al mismo nivel de `README.md` y `entrega1.ipynb`.
 
+## Instalacion de dependencias
+
+Desde la raiz del repositorio:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+En Windows:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
 ## Visualizador 1
 
 Generar visualizador 3D raw:
