@@ -14,6 +14,12 @@ Este avance cubre:
 - EDA de fragmentos por caso;
 - visualizador 1 raw con evidencia MIP y visualizacion 3D interactiva.
 
+Para preparar la asesoria con el profesor, revisar:
+
+```text
+docs/guia_asesoria_entrega1.md
+```
+
 ## Estructura del repositorio
 
 ```text
