@@ -85,7 +85,18 @@ En Windows:
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+```
+
+Si aparece un error como `numpy.dtype size changed`, el ambiente quedo mezclado o corrupto. En Windows, cerrar VS Code, abrir una terminal en la raiz del repo y recrear el ambiente:
+
+```bash
+rmdir /s /q .venv
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install --no-cache-dir -r requirements.txt
 ```
 
 ## Visualizador 1

@@ -18,7 +18,27 @@ Desde la raiz del repositorio:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+```
+
+En Windows:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+```
+
+Si aparece un error como `ValueError: numpy.dtype size changed`, el problema suele ser una incompatibilidad binaria entre `numpy` y `pandas` por paquetes instalados fuera del ambiente virtual. La solucion recomendada es recrear el ambiente:
+
+```bash
+rmdir /s /q .venv
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install --no-cache-dir -r requirements.txt
 ```
 
 ## Rutas
