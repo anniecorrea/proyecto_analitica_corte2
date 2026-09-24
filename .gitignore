@@ -1,22 +1,46 @@
 # Entornos virtuales
 .venv/
 venv/
+env/
+
+# Python
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
 
-# Datos pesados (cada quien los tiene localmente)
-data/
+# Datos pesados locales
 data_mha/
+C:*/
+*.mha
+*.nii
+*.nii.gz
+*.zip
 
-# CSVs generados
-*.csv
+# Modelos pesados
+*.pth
+*.pt
+*.ckpt
+checkpoints/
 
 # Jupyter checkpoints
 .ipynb_checkpoints/
 
-# Editor
+# Editor y sistema
 .vscode/
-
-# Archivos del sistema
 .DS_Store
 Thumbs.db
+
+# Caches
+.matplotlib_cache/
+
+# CSV generados localmente
+*.csv
+
+# Permitir documentacion ligera dentro de data/
+!data/
+!data/README.md
+
+# Permitir CSV ligeros de splits/evidencia
+!splits/*.csv
+!evidence/**/*.csv

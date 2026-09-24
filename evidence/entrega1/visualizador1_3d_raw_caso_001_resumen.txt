@@ -1,0 +1,10 @@
+Caso: 001
+Imagen: data_mha/PENGWIN_CT_train_images_part1/001.mha
+Shape array z_y_x: (401, 512, 512)
+Spacing x_y_z mm: (0.78125, 0.78125, 0.800000011920929)
+Rango HU original: min=-1023.0, max=2775.0
+Umbral hueso HU: 300
+Stride de muestreo: 4
+Puntos 3D renderizados: 30774
+Maximo de puntos permitido: 120000
+Salida HTML: evidence/entrega1/visualizador1_3d_raw_caso_001.html

@@ -1,14 +1,67 @@
-# proyecto_analitica_corte2
-Sistema de detección, segmentación y clasificación de fracturas pélvicas a partir de tomografía computarizada (dataset PENGWIN)
+# Proyecto Analitica Corte 2 PENGWIN
 
-## Datos
-Las carpetas `data/` y `data_mha/` no están incluidas en este repositorio por su tamaño.
-Cada integrante debe tener localmente:
-- `data_mha/PENGWIN_CT_train_images_part1/`
-- `data_mha/PENGWIN_CT_train_images_part2/`
-- `data_mha/PENGWIN_CT_train_labels/`
+Sistema academico para deteccion, segmentacion, clasificacion y medicion de fracturas pelvicas a partir de tomografia computarizada usando el dataset PENGWIN.
 
-Ajustar `BASE_DIR` en las primeras celdas de `entrega1.ipynb` según la ruta local de cada quien.
-Los archivos `dataset.csv`, `dataset_nifti.csv`, `splits/*.txt`, `metadata_fragments.csv` y 
-`main_fragments.csv` ya están versionados y no necesitan regenerarse (aunque el notebook 
-lo permite si hace falta).
+## Entrega 1
+
+Este avance cubre:
+
+- dataset organizado localmente;
+- splits fijos de entrenamiento, validacion y prueba;
+- carga de archivos medicos `.mha`;
+- lectura de spacing fisico del volumen;
+- ventaneo y umbral HU para resaltar hueso;
+- EDA de fragmentos por caso;
+- visualizador 1 raw con evidencia MIP y visualizacion 3D interactiva.
+
+## Estructura del repositorio
+
+```text
+.
+├── entrega1.ipynb
+├── requirements.txt
+├── data/
+│   └── README.md
+├── docs/
+│   └── reproducibilidad.md
+├── evidence/
+│   └── entrega1/
+├── splits/
+└── src/
+    ├── data/
+    ├── utils/
+    └── visualization/
+```
+
+## Datos locales
+
+Los datos pesados no se suben a GitHub. Cada integrante debe tener esta estructura local:
+
+```text
+data_mha/
+├── PENGWIN_CT_train_images_part1/
+├── PENGWIN_CT_train_images_part2/
+└── PENGWIN_CT_train_labels/
+```
+
+Verificar datos:
+
+```bash
+python3 src/data/verificar_dataset_local.py
+```
+
+## Visualizador 1
+
+Generar visualizador 3D raw:
+
+```bash
+python3 src/visualization/generar_visualizador1_3d_raw.py
+```
+
+Generar evidencia MIP complementaria:
+
+```bash
+python3 src/visualization/generar_visualizador1_mip.py
+```
+
+Las salidas quedan en `evidence/entrega1/`.
