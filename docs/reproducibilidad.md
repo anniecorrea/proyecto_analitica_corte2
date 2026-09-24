@@ -90,6 +90,7 @@ Dataset local verificado correctamente.
 ```bash
 python3 src/visualization/generar_visualizador1_3d_raw.py
 python3 src/visualization/generar_visualizador1_mip.py
+python3 src/data/generar_eda_entrega1.py
 ```
 
 Las salidas quedan en:

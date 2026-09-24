@@ -10,6 +10,7 @@ __pycache__/
 .mypy_cache/
 
 # Datos pesados locales
+data_mha
 data_mha/
 C:*/
 *.mha

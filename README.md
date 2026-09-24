@@ -114,3 +114,17 @@ python3 src/visualization/generar_visualizador1_mip.py
 ```
 
 Las salidas quedan en `evidence/entrega1/`.
+
+## EDA
+
+Generar tablas, graficas y resumen del analisis exploratorio:
+
+```bash
+python3 src/data/generar_eda_entrega1.py
+```
+
+Las salidas quedan en:
+
+```text
+evidence/entrega1/eda/
+```

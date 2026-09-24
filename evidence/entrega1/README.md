@@ -8,6 +8,7 @@ Esta carpeta contiene evidencias ligeras para el primer avance.
 - `visualizador1_3d_raw_caso_001_resumen.txt`: resumen tecnico del visualizador 3D.
 - `visualizador1_mip_raw_caso_001.png`: proyecciones MIP complementarias en tres vistas.
 - `visualizador1_mip_raw_caso_001_resumen.txt`: resumen tecnico de la evidencia MIP.
+- `eda/`: graficas, tablas y resumen del analisis exploratorio del dataset.
 
 ## Explicacion corta
 

@@ -170,6 +170,24 @@ El notebook realiza un analisis exploratorio de fragmentos. Entre los resultados
 - identificacion de fragmento principal por region;
 - conteo de huesos sin fractura y fracturados por region.
 
+Ademas, se agrego una evidencia EDA reproducible en:
+
+```text
+evidence/entrega1/eda/
+```
+
+Esta carpeta incluye:
+
+- metadata por caso;
+- metadata de fragmentos;
+- distribucion de cortes por volumen;
+- distribucion de spacing fisico;
+- distribucion de fragmentos por caso;
+- conteo de fragmentos por region anatomica;
+- distribucion de volumen de fragmentos;
+- volumen de fragmentos por region;
+- ejemplo visual CT con mascara superpuesta.
+
 Resultados importantes ya observados:
 
 - total de casos: 100;
