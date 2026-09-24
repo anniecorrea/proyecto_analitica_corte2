@@ -2,6 +2,17 @@
 
 ## Ambiente
 
+Primero clonar el repositorio en una carpeta estable, por ejemplo:
+
+```bash
+mkdir -p ~/Documents/proyectos
+cd ~/Documents/proyectos
+git clone https://github.com/anniecorrea/proyecto_analitica_corte2.git
+cd proyecto_analitica_corte2
+```
+
+Evitar clonar en `Downloads`, carpetas temporales o rutas que luego se vayan a mover.
+
 Desde la raiz del repositorio:
 
 ```bash
@@ -26,6 +37,19 @@ src/utils/project_paths.py
 ```
 
 ## Verificar datos
+
+La carpeta de datos debe quedar asi:
+
+```text
+proyecto_analitica_corte2/
+├── README.md
+├── entrega1.ipynb
+├── src/
+└── data_mha/
+    ├── PENGWIN_CT_train_images_part1/
+    ├── PENGWIN_CT_train_images_part2/
+    └── PENGWIN_CT_train_labels/
+```
 
 ```bash
 python3 src/data/verificar_dataset_local.py

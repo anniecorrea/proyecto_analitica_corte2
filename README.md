@@ -50,6 +50,20 @@ Verificar datos:
 python3 src/data/verificar_dataset_local.py
 ```
 
+## Donde clonar el repositorio
+
+Para evitar problemas de rutas, se recomienda clonar el repositorio en una carpeta de trabajo estable, no en `Downloads` ni dentro de carpetas temporales.
+
+Ejemplos recomendados:
+
+```text
+~/Documents/proyectos/proyecto_analitica_corte2
+~/Desktop/proyectos/proyecto_analitica_corte2
+C:\Users\TU_USUARIO\Documents\proyectos\proyecto_analitica_corte2
+```
+
+Despues de clonar, la carpeta `data_mha/` debe quedar dentro de la raiz del repositorio, al mismo nivel de `README.md` y `entrega1.ipynb`.
+
 ## Visualizador 1
 
 Generar visualizador 3D raw:
