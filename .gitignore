@@ -1,0 +1,22 @@
+# Entornos virtuales
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Datos pesados (cada quien los tiene localmente)
+data/
+data_mha/
+
+# CSVs generados
+*.csv
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Editor
+.vscode/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
