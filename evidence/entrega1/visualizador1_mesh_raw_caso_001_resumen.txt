@@ -1,0 +1,12 @@
+Caso: 001
+Imagen: data_mha/PENGWIN_CT_train_images_part1/001.mha
+Shape array z_y_x: (401, 512, 512)
+Spacing x_y_z mm: (0.78125, 0.78125, 0.800000011920929)
+Rango HU original: min=-1023.0, max=2775.0
+Umbral hueso HU: 300
+Stride malla: 2
+Voxeles positivos tras limpieza: 26825
+Vertices de malla: 17027
+Caras renderizadas: 34070
+Maximo de caras permitido: 80000
+Salida HTML: evidence/entrega1/visualizador1_mesh_raw_caso_001.html

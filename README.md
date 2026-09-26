@@ -7,12 +7,12 @@ Sistema academico para deteccion, segmentacion, clasificacion y medicion de frac
 Este avance cubre:
 
 - dataset organizado localmente;
-- splits fijos de entrenamiento, validacion y prueba;
+- splits fijos de entrenamiento, validacion y prueba con proporcion 75/5/20;
 - carga de archivos medicos `.mha`;
 - lectura de spacing fisico del volumen;
-- ventaneo y umbral HU para resaltar hueso;
+- ventaneo, histogramas HU y umbral para resaltar hueso;
 - EDA de fragmentos por caso;
-- visualizador 1 raw con evidencia MIP y visualizacion 3D interactiva.
+- visualizador 1 raw con evidencia MIP, visualizacion 3D por puntos y visualizacion 3D mejorada por malla.
 
 Para preparar la asesoria con el profesor, revisar:
 
@@ -55,6 +55,22 @@ Verificar datos:
 ```bash
 python3 src/data/verificar_dataset_local.py
 ```
+
+Regenerar splits fijos recomendados en asesoria:
+
+```bash
+python3 src/data/generar_splits_75_5_20.py
+```
+
+Los splits quedan en:
+
+```text
+train: 75 casos
+val: 5 casos
+test: 20 casos
+```
+
+La particion usa semilla fija y estratifica de forma aproximada por complejidad del caso, usando el numero de fragmentos de la mascara.
 
 ## Donde clonar el repositorio
 
@@ -101,6 +117,12 @@ python -m pip install --no-cache-dir -r requirements.txt
 
 ## Visualizador 1
 
+Generar visualizador mejorado por malla:
+
+```bash
+python3 src/visualization/generar_visualizador1_mesh_raw.py
+```
+
 Generar visualizador 3D raw:
 
 ```bash
@@ -114,6 +136,20 @@ python3 src/visualization/generar_visualizador1_mip.py
 ```
 
 Las salidas quedan en `evidence/entrega1/`.
+
+## Ventaneo HU
+
+Generar evidencia para justificar el ventaneo con histogramas y comparacion visual:
+
+```bash
+python3 src/data/generar_evidencia_ventaneo_hu.py
+```
+
+Las salidas quedan en:
+
+```text
+evidence/entrega1/ventaneo_hu/
+```
 
 ## EDA
 

@@ -23,9 +23,9 @@ Para esta primera entrega se busca cumplir:
 - tener splits fijos de entrenamiento, validacion y prueba;
 - poder cargar los archivos medicos `.mha`;
 - leer informacion fisica del volumen, especialmente el spacing en milimetros;
-- aplicar ventaneo o umbral HU para resaltar hueso;
+- aplicar ventaneo, histogramas HU y umbral para resaltar hueso;
 - hacer EDA de fragmentos por caso;
-- generar una primera visualizacion volumetrica del CT crudo.
+- generar una primera visualizacion volumetrica del CT crudo, ahora mejorada con malla 3D.
 
 En palabras simples, el mensaje para el profesor es:
 
@@ -128,17 +128,23 @@ splits/dataset.csv
 
 Los splits permiten que el equipo trabaje con la misma particion de datos y que los resultados sean comparables.
 
-Punto a validar con el profesor:
+Despues de la asesoria con el profesor Ferro, se ajusto la proporcion a:
 
-- si la proporcion actual de splits es adecuada;
-- si espera validacion por paciente/caso de alguna forma especifica;
-- si quiere que los splits se reporten explicitamente en el informe.
+```text
+train: 75 casos
+val: 5 casos
+test: 20 casos
+```
+
+La justificacion es que validacion sirve para monitorear sobreajuste durante entrenamiento, mientras que test debe ser mas amplio para evaluar generalizacion y capturar casos faciles, medios y dificiles.
+
+Los splits se generan con semilla fija y una estratificacion aproximada por complejidad usando el numero de fragmentos por caso.
 
 ### 5.3 Carga de archivos medicos
 
 El avance trabaja con archivos `.mha`, que son los archivos descargados del dataset.
 
-Tambien se contempla la conversion a NIfTI en el notebook, pero para la primera entrega lo importante es demostrar que podemos leer el formato medico original, extraer el volumen y acceder al spacing fisico.
+La recomendacion de la asesoria fue mantener `.mha` como formato principal del flujo. La conversion a NIfTI queda como paso opcional o exploratorio, pero no debe ser una dependencia central del proyecto.
 
 ### 5.4 Ventaneo y umbral HU
 
@@ -150,11 +156,18 @@ HU >= 300
 
 Esto no es una segmentacion final. Es un preprocesamiento clasico sobre el volumen crudo para visualizar principalmente hueso.
 
-Punto a validar con el profesor:
+Despues de la asesoria, se agrego evidencia con histogramas para justificar el ventaneo y no depender solo de la inspeccion visual:
 
-- si `HU >= 300` es aceptable para el visualizador raw inicial;
-- si prefiere otro rango de ventana para hueso;
-- si quiere que se explique como ventaneo HU o como umbral HU.
+```text
+evidence/entrega1/ventaneo_hu/
+```
+
+La evidencia compara:
+
+- histograma HU crudo;
+- ventana osea;
+- umbral HU para hueso;
+- corte antes/despues del preprocesamiento.
 
 ### 5.5 EDA de fragmentos
 
@@ -206,9 +219,23 @@ Punto a validar con el profesor:
 
 ## 6. Visualizador 1
 
-La guia pide un visualizador inicial del volumen crudo mediante MIP y mostrando hueso. Para cubrir esto de forma clara, se generaron dos evidencias:
+La guia pide un visualizador inicial del volumen crudo mediante MIP y mostrando hueso. Para cubrir esto de forma clara, se generaron tres evidencias:
 
-### 6.1 Visualizador 3D raw
+### 6.1 Visualizador mesh raw mejorado
+
+Archivo:
+
+```text
+evidence/entrega1/visualizador1_mesh_raw_caso_001.html
+```
+
+Este archivo responde a la recomendacion de la asesoria: pasar de puntos a malla. La malla se obtiene a partir del volumen `.mha`, umbral HU, limpieza morfologica y Marching Cubes.
+
+Explicacion sugerida:
+
+> A partir de la asesoria, mejoramos el visualizador pasando de nube de puntos a una malla 3D. Esto reduce el ruido visual y permite interpretar mejor la superficie del hueso. La malla no es una prediccion del modelo; es una reconstruccion exploratoria del CT crudo usando umbral HU y limpieza basica.
+
+### 6.2 Visualizador 3D raw por puntos
 
 Archivo:
 
@@ -220,9 +247,9 @@ Este archivo muestra una vista 3D interactiva del volumen CT crudo. Los puntos r
 
 Explicacion sugerida:
 
-> Los puntos corresponden a voxeles del CT con intensidad HU mayor o igual a 300. Es una visualizacion raw inicial, no una segmentacion del modelo. Por eso puede incluir ruido, camilla u otras estructuras de alta intensidad.
+> Los puntos corresponden a voxeles del CT con intensidad HU mayor o igual a 300. Es una visualizacion raw inicial, no una segmentacion del modelo. Por eso puede incluir ruido, camilla u otras estructuras de alta intensidad. Esta version queda como evidencia inicial, pero la version recomendada para presentar es la malla.
 
-### 6.2 Evidencia MIP complementaria
+### 6.3 Evidencia MIP complementaria
 
 Archivo:
 

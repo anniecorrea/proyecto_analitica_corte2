@@ -42,6 +42,13 @@ Thumbs.db
 !data/
 !data/README.md
 
+# Salidas locales reproducibles generadas por el notebook
+data/nifti_images/
+data/nifti_labels/
+data/dataset_nifti.csv
+data/metadata_fragments.csv
+data/main_fragments.csv
+
 # Permitir CSV ligeros de splits/evidencia
 !splits/*.csv
 !evidence/**/*.csv
