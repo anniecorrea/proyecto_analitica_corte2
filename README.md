@@ -117,7 +117,13 @@ python -m pip install --no-cache-dir -r requirements.txt
 
 ## Visualizador 1
 
-Generar visualizador mejorado por malla:
+Generar visualizador limpio por malla usando labels de referencia:
+
+```bash
+python3 src/visualization/generar_visualizador1_mesh_labels.py
+```
+
+Generar visualizador raw por malla usando CT y umbral HU dentro de la ROI de pelvis:
 
 ```bash
 python3 src/visualization/generar_visualizador1_mesh_raw.py

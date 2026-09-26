@@ -1,0 +1,21 @@
+Caso: 001
+Label: data_mha/PENGWIN_CT_train_labels/001.mha
+Shape label z_y_x: (401, 512, 512)
+Spacing x_y_z mm: (0.78125, 0.78125, 0.800000011920929)
+Stride malla: 2
+
+Region: sacro
+ROI z_y_x desde [150, 247, 180] hasta [336, 399, 349]
+Vertices: 26603
+Caras: 53298
+
+Region: coxal_izquierdo
+ROI z_y_x desde [63, 179, 251] hasta [353, 385, 463]
+Vertices: 40343
+Caras: 80910
+
+Region: coxal_derecho
+ROI z_y_x desde [71, 176, 68] hasta [370, 379, 266]
+Vertices: 40643
+Caras: 81550
+Salida HTML: evidence/entrega1/visualizador1_mesh_labels_caso_001.html

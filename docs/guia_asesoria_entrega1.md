@@ -221,7 +221,21 @@ Punto a validar con el profesor:
 
 La guia pide un visualizador inicial del volumen crudo mediante MIP y mostrando hueso. Para cubrir esto de forma clara, se generaron tres evidencias:
 
-### 6.1 Visualizador mesh raw mejorado
+### 6.1 Visualizador mesh por labels recomendado
+
+Archivo:
+
+```text
+evidence/entrega1/visualizador1_mesh_labels_caso_001.html
+```
+
+Este archivo es la version recomendada para presentar. Usa las labels de referencia del dataset para construir mallas separadas por region anatomica: sacro, coxal izquierdo y coxal derecho.
+
+Explicacion sugerida:
+
+> A partir de la asesoria, mejoramos el visualizador pasando de nube de puntos a malla 3D. Para presentar una superficie limpia y anatonicamente interpretable usamos las labels de referencia del dataset, separadas por region. Esto no es una prediccion del modelo; es una visualizacion exploratoria de la anotacion disponible.
+
+### 6.2 Visualizador mesh raw exploratorio
 
 Archivo:
 
@@ -229,13 +243,13 @@ Archivo:
 evidence/entrega1/visualizador1_mesh_raw_caso_001.html
 ```
 
-Este archivo responde a la recomendacion de la asesoria: pasar de puntos a malla. La malla se obtiene a partir del volumen `.mha`, umbral HU, limpieza morfologica y Marching Cubes.
+Este archivo responde a la recomendacion de la asesoria: pasar de puntos a malla. La malla se obtiene a partir del volumen `.mha`, umbral HU, ROI de pelvis, limpieza morfologica y Marching Cubes. Puede conservar algo de ruido porque parte del CT raw.
 
 Explicacion sugerida:
 
-> A partir de la asesoria, mejoramos el visualizador pasando de nube de puntos a una malla 3D. Esto reduce el ruido visual y permite interpretar mejor la superficie del hueso. La malla no es una prediccion del modelo; es una reconstruccion exploratoria del CT crudo usando umbral HU y limpieza basica.
+> Esta version reconstruye superficie desde el CT crudo usando umbral HU. Es util para mostrar el proceso raw, pero puede ser menos limpia que la version por labels.
 
-### 6.2 Visualizador 3D raw por puntos
+### 6.3 Visualizador 3D raw por puntos
 
 Archivo:
 
@@ -249,7 +263,7 @@ Explicacion sugerida:
 
 > Los puntos corresponden a voxeles del CT con intensidad HU mayor o igual a 300. Es una visualizacion raw inicial, no una segmentacion del modelo. Por eso puede incluir ruido, camilla u otras estructuras de alta intensidad. Esta version queda como evidencia inicial, pero la version recomendada para presentar es la malla.
 
-### 6.3 Evidencia MIP complementaria
+### 6.4 Evidencia MIP complementaria
 
 Archivo:
 

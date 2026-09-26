@@ -12,6 +12,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[2]
 sys.path.append(str(PROJECT_DIR / "src"))
 
 from utils.project_paths import DATA_MHA, EVIDENCE
+from utils.project_paths import LABELS
 
 
 OUTPUT_DIR = EVIDENCE / "entrega1"
@@ -35,6 +36,13 @@ def find_image_path(case_id: str) -> Path:
     raise FileNotFoundError(f"No se encontro la imagen del caso {case_id}")
 
 
+def find_label_path(case_id: str) -> Path:
+    label_path = LABELS / f"{case_id}.mha"
+    if label_path.exists():
+        return label_path
+    raise FileNotFoundError(f"No se encontro el label del caso {case_id}")
+
+
 def load_ct_volume(case_id: str):
     image_path = find_image_path(case_id)
     image = sitk.ReadImage(str(image_path))
@@ -43,28 +51,35 @@ def load_ct_volume(case_id: str):
     return image_path, volume, spacing_xyz
 
 
-def keep_largest_components(mask: np.ndarray, n_components: int = 3) -> np.ndarray:
-    labels, n_labels = ndi.label(mask)
-    if n_labels == 0:
-        return mask
-
-    counts = np.bincount(labels.ravel())
-    counts[0] = 0
-    selected = np.argsort(counts)[-n_components:]
-    return np.isin(labels, selected)
+def load_label_volume(case_id: str):
+    label_path = find_label_path(case_id)
+    label = sitk.ReadImage(str(label_path))
+    label_array = sitk.GetArrayFromImage(label)
+    return label_path, label_array
 
 
-def build_bone_mask(
+def crop_to_label_roi(volume: np.ndarray, label_array: np.ndarray, margin: int = 18):
+    zyx = np.argwhere(label_array > 0)
+    if len(zyx) == 0:
+        raise SystemExit("El label no tiene voxeles positivos para construir ROI.")
+
+    lower = np.maximum(zyx.min(axis=0) - margin, 0)
+    upper = np.minimum(zyx.max(axis=0) + margin + 1, volume.shape)
+    z0, y0, x0 = lower
+    z1, y1, x1 = upper
+    return volume[z0:z1, y0:y1, x0:x1], lower, upper
+
+
+def build_bone_mask_from_ct(
     volume: np.ndarray,
     hu_threshold: float = 300,
     stride: int = 2,
-    min_component_voxels: int = 2_000,
+    min_component_voxels: int = 250,
 ) -> np.ndarray:
     sampled = volume[::stride, ::stride, ::stride]
     mask = sampled >= hu_threshold
 
     structure = np.ones((3, 3, 3), dtype=bool)
-    mask = ndi.binary_opening(mask, structure=structure, iterations=1)
     mask = ndi.binary_closing(mask, structure=structure, iterations=1)
     mask = ndi.binary_fill_holes(mask)
 
@@ -74,12 +89,11 @@ def build_bone_mask(
         keep = counts >= min_component_voxels
         keep[0] = False
         mask = keep[labels]
-        mask = keep_largest_components(mask, n_components=3)
 
     return mask
 
 
-def marching_cubes_mesh(mask: np.ndarray, spacing_xyz, stride: int = 2):
+def marching_cubes_mesh(mask: np.ndarray, spacing_xyz, origin_zyx, stride: int = 2):
     # El array esta en orden z, y, x; spacing debe corresponder a z, y, x.
     spacing_zyx = (
         spacing_xyz[2] * stride,
@@ -92,9 +106,9 @@ def marching_cubes_mesh(mask: np.ndarray, spacing_xyz, stride: int = 2):
         spacing=spacing_zyx,
     )
 
-    z = verts_zyx[:, 0]
-    y = verts_zyx[:, 1]
-    x = verts_zyx[:, 2]
+    z = verts_zyx[:, 0] + origin_zyx[0] * spacing_xyz[2]
+    y = verts_zyx[:, 1] + origin_zyx[1] * spacing_xyz[1]
+    x = verts_zyx[:, 2] + origin_zyx[2] * spacing_xyz[0]
     return x, y, z, faces
 
 
@@ -114,12 +128,27 @@ def save_mesh_visualizer(
 ):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     image_path, volume, spacing_xyz = load_ct_volume(case_id)
-    mask = build_bone_mask(volume, hu_threshold=hu_threshold, stride=stride)
+    label_path, label_array = load_label_volume(case_id)
+    cropped_volume, crop_lower_zyx, crop_upper_zyx = crop_to_label_roi(
+        volume=volume,
+        label_array=label_array,
+        margin=18,
+    )
+    mask = build_bone_mask_from_ct(
+        cropped_volume,
+        hu_threshold=hu_threshold,
+        stride=stride,
+    )
 
     if not np.any(mask):
         raise SystemExit("La mascara quedo vacia; revisa el umbral HU.")
 
-    x, y, z, faces = marching_cubes_mesh(mask, spacing_xyz=spacing_xyz, stride=stride)
+    x, y, z, faces = marching_cubes_mesh(
+        mask,
+        spacing_xyz=spacing_xyz,
+        origin_zyx=crop_lower_zyx,
+        stride=stride,
+    )
     faces = decimate_faces(faces, max_faces=max_faces)
 
     fig = go.Figure(
@@ -131,8 +160,8 @@ def save_mesh_visualizer(
                 i=faces[:, 2],
                 j=faces[:, 1],
                 k=faces[:, 0],
-                color="#D9D0C7",
-                opacity=0.88,
+                color="#F0E5D8",
+                opacity=0.96,
                 flatshading=False,
                 lighting={
                     "ambient": 0.45,
@@ -141,26 +170,35 @@ def save_mesh_visualizer(
                     "specular": 0.18,
                 },
                 lightposition={"x": 100, "y": 200, "z": 300},
-                name="Malla de hueso",
+                name="Malla de hueso en ROI pelvis",
             )
         ]
     )
     fig.update_layout(
         title=(
             f"Visualizador 1 mesh raw caso {case_id} "
-            f"HU >= {hu_threshold}, stride={stride}"
+            f"HU >= {hu_threshold}, ROI pelvis, stride={stride}"
         ),
         scene={
             "xaxis_title": "x mm",
             "yaxis_title": "y mm",
             "zaxis_title": "z mm",
             "aspectmode": "data",
+            "camera": {
+                "eye": {"x": 1.6, "y": 1.4, "z": 0.9},
+                "center": {"x": 0, "y": 0, "z": 0},
+            },
         },
         margin={"l": 0, "r": 0, "t": 50, "b": 0},
+        dragmode="orbit",
     )
 
     output_html = OUTPUT_DIR / f"visualizador1_mesh_raw_caso_{case_id}.html"
-    fig.write_html(output_html, include_plotlyjs="cdn")
+    fig.write_html(
+        output_html,
+        include_plotlyjs=True,
+        config={"scrollZoom": True, "displaylogo": False, "responsive": True},
+    )
 
     summary_path = OUTPUT_DIR / f"visualizador1_mesh_raw_caso_{case_id}_resumen.txt"
     summary_path.write_text(
@@ -168,7 +206,10 @@ def save_mesh_visualizer(
             [
                 f"Caso: {case_id}",
                 f"Imagen: {to_repo_relative(image_path)}",
+                f"Label usado para ROI: {to_repo_relative(label_path)}",
                 f"Shape array z_y_x: {volume.shape}",
+                f"ROI z_y_x desde {crop_lower_zyx.tolist()} hasta {crop_upper_zyx.tolist()}",
+                f"Shape ROI z_y_x: {cropped_volume.shape}",
                 f"Spacing x_y_z mm: {spacing_xyz}",
                 f"Rango HU original: min={float(volume.min())}, max={float(volume.max())}",
                 f"Umbral hueso HU: {hu_threshold}",
