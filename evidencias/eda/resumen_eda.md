@@ -1,4 +1,4 @@
-# Resumen EDA Entrega 1
+# Resumen EDA del proyecto
 
 ## Dataset
 
@@ -30,7 +30,7 @@ case_id
 
 ## Conclusiones
 
-- El dataset local esta completo para el primer avance: hay 100 casos con imagen y label correspondiente.
+- El dataset local esta completo: hay 100 casos con imagen y label correspondiente.
 - Todos los casos verificados mantienen consistencia de tamano y spacing entre CT y label.
 - El numero de fragmentos por caso varia, lo cual anticipa dificultad desigual entre casos simples y casos complejos.
 - Existen fragmentos de volumen muy pequeno; estos pueden ser dificiles de segmentar y afectar metricas como Dice o IoU.

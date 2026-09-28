@@ -29,3 +29,13 @@
   directamente con SimpleITK.
 - Revision critica: se ajustaron los ejes del MIP al orden `(z, y, x)` que
   devuelve SimpleITK y se regenero `splits/dataset.csv` con rutas `.mha`.
+
+## Consolidacion del proyecto
+
+- Prompt del usuario: se solicito entregar todo en un solo notebook y eliminar
+  la estructura fragmentada por avances.
+- Cambio: el flujo fue consolidado en `proyecto_pengwin.ipynb`. La malla 3D y
+  los datos/targets se incorporaron como secciones ejecutables del mismo
+  notebook.
+- Validacion: el notebook completo se ejecuto desde cero con 52 celdas, 26
+  celdas de codigo y cero errores.

@@ -14,8 +14,6 @@ data_mha
 data_mha/
 C:*/
 *.mha
-*.nii
-*.nii.gz
 *.zip
 
 # Modelos pesados
@@ -38,14 +36,6 @@ Thumbs.db
 # CSV generados localmente
 *.csv
 
-# Permitir documentacion ligera dentro de data/
-!data/
-!data/README.md
-
-# Salidas locales reproducibles generadas por el notebook
-data/metadata_fragments.csv
-data/main_fragments.csv
-
 # Permitir CSV ligeros de splits/evidencia
 !splits/*.csv
-!evidence/**/*.csv
+!evidencias/**/*.csv
