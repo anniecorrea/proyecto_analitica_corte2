@@ -20,3 +20,12 @@
 - Limitaciones: este modulo prepara ground truth; no implementa ni evalua el
   backbone, CBAM, la cabeza de deteccion ni NMS. El equipo debe revisar el
   contrato de targets al integrarlo con la arquitectura final.
+
+## Limpieza del flujo medico
+
+- Prompt del usuario: "neceisto que además lo de nifti se elimine porque el profesor mencionó que no lo usaramos".
+- Cambio: se retiraron del notebook la conversion, verificacion y registro
+  NIfTI. El conteo de fragmentos, EDA, ventaneo HU y MIP ahora leen `.mha`
+  directamente con SimpleITK.
+- Revision critica: se ajustaron los ejes del MIP al orden `(z, y, x)` que
+  devuelve SimpleITK y se regenero `splits/dataset.csv` con rutas `.mha`.

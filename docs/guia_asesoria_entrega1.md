@@ -144,7 +144,7 @@ Los splits se generan con semilla fija y una estratificacion aproximada por comp
 
 El avance trabaja con archivos `.mha`, que son los archivos descargados del dataset.
 
-La recomendacion de la asesoria fue mantener `.mha` como formato principal del flujo. La conversion a NIfTI queda como paso opcional o exploratorio, pero no debe ser una dependencia central del proyecto.
+La recomendacion de la asesoria fue trabajar directamente con `.mha`. El flujo fue simplificado para usar SimpleITK en carga, EDA, ventaneo y visualizacion, sin conversiones intermedias.
 
 ### 5.4 Ventaneo y umbral HU
 
@@ -282,7 +282,7 @@ Explicacion sugerida:
 ### Datos y primer avance
 
 1. ¿La organizacion actual del dataset en imagenes parte 1, parte 2 y labels es adecuada para el proyecto?
-2. ¿Le parece bien trabajar directamente con `.mha` o prefiere que convirtamos todo a NIfTI desde el inicio?
+2. ¿La lectura directa de `.mha` con SimpleITK conserva correctamente dimensiones, spacing, origen y direccion para las etapas posteriores?
 3. ¿El split train/val/test actual es suficiente o recomienda una proporcion especifica?
 4. ¿Debemos reportar los splits como IDs de caso en el informe?
 5. ¿Es necesario conservar `dataset.csv` con rutas relativas o basta con `train.txt`, `val.txt` y `test.txt`?

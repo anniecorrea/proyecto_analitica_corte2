@@ -1,7 +1,6 @@
 numpy==2.2.6
 pandas==2.2.3
 SimpleITK==2.5.2
-nibabel==5.3.2
 Pillow==11.3.0
 plotly==6.3.0
 scipy==1.15.3
