@@ -170,3 +170,30 @@ Las salidas quedan en:
 ```text
 evidence/entrega1/eda/
 ```
+
+## Entrega 2 - Datos y targets de deteccion
+
+La preparacion corte a corte para la cabeza de deteccion esta en:
+
+```text
+src/data/targets_detection.py
+```
+
+Generar el manifiesto de cortes positivos y la evidencia visual de bounding
+boxes:
+
+```bash
+python3 src/data/generar_targets_semana9.py
+```
+
+Ejecutar las pruebas de esta etapa:
+
+```bash
+python3 -m unittest tests/test_targets_detection.py -v
+```
+
+La explicacion del contrato de datos, taxonomia y formato de cajas esta en:
+
+```text
+docs/datos_targets_semana9.md
+```
