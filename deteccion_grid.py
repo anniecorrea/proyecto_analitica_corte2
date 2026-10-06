@@ -15,6 +15,24 @@ USO
     L = grid_detection_loss(out, T)                    # dict: total, obj, box, cls, mean_iou...
     preds = postprocess(out, nms_fn=None)              # el NMS propio se enchufa en nms_fn
 Para probar otros pesos, pasarlos SIEMPRE explícitos: grid_detection_loss(out, T, lambdas=mis_lambdas).
+
+CONTRATO CON LAS OTRAS PIEZAS (backbone -> CBAM -> esta cabeza)
+  * Backbone (Miguel): devuelve la tupla (pooled, fmap), con fmap [B, 256, 16, 16].
+  * CBAM / compuerta residual (Annie): recibe fmap y devuelve la tupla (y, ch_attn, sp_attn), con y [B, 256, 16, 16].
+  * Esta cabeza recibe UN tensor [B, 256, 16, 16]: al empalmar, desempaquetar las tuplas y pasarle solo y.
+        _, fmap = backbone(x)
+        fmap, _, _ = cbam(fmap)
+        out = head(fmap)
+
+AJUSTAR CON EL DATASET COMPLETO
+  * LAMBDAS y los priors de GridDetectionHead (obj_prior = 0.0078, wh_prior = 0.20) se eligieron con las
+    12 cajas del batch fijo y mapas sintéticos: recalcularlos/reconfirmarlos con el modelo completo.
+
+LIMITACIONES CONOCIDAS
+  * Una sola celda positiva por objeto; si dos centros caen en la misma celda, gana la caja más grande.
+  * Cajas muy pequeñas (la de 2 x 4 px del caso 001) no convergen: la sigmoide de tx, ty se satura en el borde de la celda.
+  * build_targets usa un ciclo de Python y devuelve tensores en CPU (la pérdida los mueve al dispositivo);
+    en un entrenamiento largo conviene llamarlo en el collate_fn del DataLoader.
 """
 import math
 
