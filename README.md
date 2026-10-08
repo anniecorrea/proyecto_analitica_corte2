@@ -75,7 +75,19 @@ python -m pip install --no-cache-dir -r requirements.txt
 
 El notebook comprueba los 100 pares CT-label, genera los splits, ejecuta el EDA,
 aplica ventaneo HU, crea el visualizador MIP y la malla 3D, y prepara los
-targets de deteccion con bounding boxes.
+targets de deteccion con bounding boxes. También calcula la distancia de
+referencia entre fragmentos de las máscaras MHA y genera la tabla
+`evidencias/distancias_referencia.csv`.
+
+Para regenerar las capturas de revisión de distancia desde la raíz del
+repositorio, después de tener los datos locales instalados:
+
+```bash
+python3 generar_evidencias_distancias.py
+```
+
+Las capturas son proyecciones 2D para inspección; el valor de distancia se
+calcula en 3D con el espaciado físico del archivo MHA.
 
 ## Resultados actuales
 
@@ -83,6 +95,9 @@ targets de deteccion con bounding boxes.
 - Splits por paciente: 75 entrenamiento, 5 validacion y 20 prueba.
 - Semilla fija: 42.
 - 575 fragmentos anotados.
+- Distancias de referencia para 275 fragmentos conminutos, comparados con el
+  fragmento principal de su región; los 300 principales se incluyen en la tabla
+  con distancia cero por definición.
 - Visualizador MIP y malla 3D interactiva.
 - 24.234 cortes positivos con targets de deteccion.
 - Cero pacientes compartidos entre splits.
