@@ -40,3 +40,9 @@ cache_entrenamiento/
 # Permitir CSV ligeros de splits/evidencia
 !splits/*.csv
 !evidencias/**/*.csv
+
+# Checkpoint descomprimido y pesos: se comparten fuera del repositorio
+evidencias/entrenamiento_multitarea/best_C_conjunto/
+
+# Archivos temporales de Word
+~$*
