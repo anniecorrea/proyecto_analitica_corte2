@@ -13,7 +13,9 @@ USO
     out = head(fmap)                                   # fmap: [B, 256, 16, 16] (backbone + CBAM)
     T = build_targets(targets)                         # targets: lista de dicts con 'boxes' y 'labels'
     L = grid_detection_loss(out, T)                    # dict: total, obj, box, cls, mean_iou...
-    preds = postprocess(out, nms_fn=None)              # el NMS propio se enchufa en nms_fn
+    raw = decode_predictions(out, score_thresh=0.05)   # candidatas ANTES del NMS (evidencia antes/después)
+    preds = postprocess(out, nms_fn=nms_por_clase,     # candidatas DESPUÉS del NMS propio (semana 10)
+                        iou_thresh=0.5, max_det_per_class=1)
 Para probar otros pesos, pasarlos SIEMPRE explícitos: grid_detection_loss(out, T, lambdas=mis_lambdas).
 
 CONTRATO CON LAS OTRAS PIEZAS (backbone -> CBAM -> esta cabeza)
@@ -177,12 +179,15 @@ def grid_detection_loss(out, tgt, lambdas=LAMBDAS):
 @torch.no_grad()
 def decode_predictions(out, score_thresh=0.0, img_size=IMG_SIZE):
     """Logits [B,8,S,S] -> lista de B dicts con una candidata por celda, ordenadas por score (mayor a menor):
-    boxes [N,4] xyxy en px | scores [N] = objectness x prob. de clase | labels [N] en 1..3 | cells [N,2] = (fila, columna)."""
+    boxes [N,4] xyxy en px | scores [N] = objectness x prob. de clase | labels [N] en 1..3 | cells [N,2] = (fila, columna)
+    | class_probs [N,3] = probabilidades de las 3 clases (las necesita el AUC) | obj [N] = probabilidad de objectness."""
     out = out.float()
     obj_logit, box_logit, cls_logit = split_head_output(out)
     B, S = obj_logit.shape[0], obj_logit.shape[1]
-    cls_score, cls_idx = torch.softmax(cls_logit, dim=-1).max(dim=-1)
-    score = torch.sigmoid(obj_logit) * cls_score
+    cls_prob = torch.softmax(cls_logit, dim=-1)                        # [B,S,S,3]
+    cls_score, cls_idx = cls_prob.max(dim=-1)
+    obj_prob = torch.sigmoid(obj_logit)
+    score = obj_prob * cls_score
     t = torch.sigmoid(box_logit)
     rows = torch.arange(S, device=out.device).view(S, 1).expand(S, S).reshape(-1)
     cols = torch.arange(S, device=out.device).view(1, S).expand(S, S).reshape(-1)
@@ -193,17 +198,89 @@ def decode_predictions(out, score_thresh=0.0, img_size=IMG_SIZE):
         keep = (sc >= score_thresh).nonzero(as_tuple=True)[0]
         keep = keep[sc[keep].argsort(descending=True)]                 # el NMS parte de scores ordenados
         results.append({"boxes": boxes[keep], "scores": sc[keep], "labels": lb[keep],
-                        "cells": torch.stack([rows[keep], cols[keep]], dim=1)})
+                        "cells": torch.stack([rows[keep], cols[keep]], dim=1),
+                        "class_probs": cls_prob[b].reshape(-1, cls_prob.shape[-1])[keep],
+                        "obj": obj_prob[b].reshape(-1)[keep]})
     return results
 
 
-def postprocess(out, score_thresh=0.05, nms_fn=None, iou_thresh=0.5):
-    """decode_predictions + NMS opcional. nms_fn(boxes, scores, labels, iou_thresh) -> índices a conservar."""
+# --------------------------------------------------------------------------------------------------
+# NMS propio por clase (semana 10)
+# --------------------------------------------------------------------------------------------------
+# Valores INICIALES; se eligen con val (nunca con test). El filtro de score lo hace decode_predictions
+# (postprocess(out, score_thresh=...)), por eso no va aquí.
+NMS_CONFIG = {"iou_thresh": 0.5, "max_det_per_class": 1}
+
+
+@torch.no_grad()
+def nms_por_clase(boxes, scores, labels, iou_thresh=0.5, score_thresh=0.0, max_det_per_class=None):
+    """Non-Maximum Suppression voraz, aplicado por separado a cada clase.
+
+    boxes [N,4] xyxy en px | scores [N] | labels [N] (1..3).
+    Devuelve un tensor long con los ÍNDICES (sobre la entrada original) de las cajas conservadas,
+    ordenados por score de mayor a menor. Si no queda ninguna caja devuelve un tensor vacío [0], nunca None.
+
+    Reglas (deben quedar documentadas en el informe):
+      1. Se descartan antes del NMS: score < score_thresh, score o coordenadas no finitas (NaN/inf)
+         y cajas degeneradas (x2 <= x1 o y2 <= y1).
+      2. Dentro de cada clase: se toma la caja de mayor score, se conserva y se eliminan las de la
+         MISMA clase con IoU > iou_thresh (estrictamente mayor: IoU == iou_thresh se conserva).
+         Se repite con las que quedan.
+      3. Cajas de clases distintas nunca se suprimen entre sí (un sacro no borra a un coxal).
+      4. max_det_per_class (None = sin límite) corta cada clase en sus k mejores cajas. Por defecto en el
+         proyecto es 1, porque el target tiene como máximo una caja por región anatómica en cada corte.
+      5. Empates de score: gana la caja con índice menor (orden estable), para que el resultado sea reproducible.
+    Compatible con postprocess: nms_fn(boxes, scores, labels, iou_thresh, **kwargs).
+    """
+    if not 0.0 <= float(iou_thresh) <= 1.0:
+        raise ValueError(f"iou_thresh debe estar en [0, 1]; llegó {iou_thresh}")
+    if max_det_per_class is not None and int(max_det_per_class) < 1:
+        raise ValueError("max_det_per_class debe ser None o un entero >= 1")
+
+    boxes = torch.as_tensor(boxes)
+    device = boxes.device
+    boxes = boxes.float().reshape(-1, 4)                               # float32 aunque llegue en float16 (AMP)
+    scores = torch.as_tensor(scores, device=device).float().reshape(-1)
+    labels = torch.as_tensor(labels, device=device).long().reshape(-1)
+    if not (boxes.shape[0] == scores.shape[0] == labels.shape[0]):
+        raise ValueError(f"boxes, scores y labels deben tener el mismo N: "
+                         f"{boxes.shape[0]}, {scores.shape[0]}, {labels.shape[0]}")
+
+    # 1) filtro de validez
+    valid = (torch.isfinite(scores) & torch.isfinite(boxes).all(dim=1) & (scores >= score_thresh)
+             & (boxes[:, 2] > boxes[:, 0]) & (boxes[:, 3] > boxes[:, 1]))
+
+    kept = []
+    for class_id in torch.unique(labels[valid]).tolist():              # 3) cada clase por separado
+        idx = torch.nonzero(valid & (labels == class_id), as_tuple=True)[0]
+        order = idx[torch.argsort(scores[idx], descending=True, stable=True)]   # 5) orden estable
+        n_class = 0
+        while order.numel() > 0:                                       # 2) bucle voraz
+            best = order[0]
+            kept.append(best)
+            n_class += 1
+            if max_det_per_class is not None and n_class >= int(max_det_per_class):
+                break                                                  # 4) tope por clase
+            rest = order[1:]
+            if rest.numel() == 0:
+                break
+            ious = box_iou(boxes[best].unsqueeze(0), boxes[rest])      # [R]: IoU de la mejor contra las demás
+            order = rest[ious <= iou_thresh]                           # sobreviven las que NO se solapan demasiado
+
+    if not kept:
+        return torch.zeros(0, dtype=torch.long, device=device)
+    keep = torch.stack(kept)
+    return keep[torch.argsort(scores[keep], descending=True, stable=True)]
+
+
+def postprocess(out, score_thresh=0.05, nms_fn=None, iou_thresh=0.5, **nms_kwargs):
+    """decode_predictions + NMS opcional. nms_fn(boxes, scores, labels, iou_thresh, **nms_kwargs) -> índices.
+    Ejemplo: postprocess(out, nms_fn=nms_por_clase, iou_thresh=0.5, max_det_per_class=1)."""
     preds = decode_predictions(out, score_thresh)
     if nms_fn is None:
         return preds
     final = []
     for p in preds:
-        keep = nms_fn(p["boxes"], p["scores"], p["labels"], iou_thresh)
+        keep = nms_fn(p["boxes"], p["scores"], p["labels"], iou_thresh, **nms_kwargs)
         final.append({k: v[keep] for k, v in p.items()})
     return final
