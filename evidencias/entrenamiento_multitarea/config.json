@@ -1,0 +1,87 @@
+{
+  "SEED": 42,
+  "IMAGE_SIZE": 256,
+  "GRID_SIZE": 16,
+  "BACKBONE_NAME": "plus",
+  "USE_CBAM": true,
+  "USE_CBAM_GATE": true,
+  "BATCH_SIZE": 16,
+  "VAL_BATCH_SIZE": 32,
+  "WEIGHT_DECAY": 0.0001,
+  "GRAD_CLIP": 10.0,
+  "SEG_WEIGHTS": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "DET_LAMBDAS_SOURCE": "loaded",
+  "JITTER_PX": 8.0,
+  "PRED_BOX_SCORE_MIN": 0.05,
+  "INSTANCE_EVAL_N": 128,
+  "EVAL_SCORE_MIN": 0.01,
+  "USE_AMP": true,
+  "SMOKE_TEST": false,
+  "MAX_TRAIN_SLICES": null,
+  "MAX_VAL_SLICES": null,
+  "DET_LAMBDAS": {
+    "obj": 0.46,
+    "box": 2.9,
+    "cls": 2.03,
+    "noobj": 1.0,
+    "l1": 1.0,
+    "iou": 1.0
+  },
+  "STAGES": [
+    {
+      "name": "A_deteccion",
+      "epochs": 10,
+      "lr": 0.001,
+      "train": [
+        "backbone",
+        "cbam",
+        "det_head"
+      ],
+      "w_det": 1.0,
+      "w_seg": 0.0,
+      "prior": "gt",
+      "select": "det"
+    },
+    {
+      "name": "B_decoder",
+      "epochs": 10,
+      "lr": 0.001,
+      "train": [
+        "seg_decoder"
+      ],
+      "w_det": 0.0,
+      "w_seg": 1.0,
+      "prior": "gt_jitter",
+      "select": "seg_gt"
+    },
+    {
+      "name": "C_conjunto",
+      "epochs": 10,
+      "lr": 0.0003,
+      "train": [
+        "backbone",
+        "cbam",
+        "det_head",
+        "seg_decoder"
+      ],
+      "w_det": 1.0,
+      "w_seg": 1.0,
+      "prior": "mixed",
+      "p_pred_end": 0.5,
+      "select": "both"
+    }
+  ],
+  "DATA_VERSION": {
+    "dataset_csv": "48bf1f9d58fc",
+    "manifest": "e98b40ddbe21",
+    "image_size": 256,
+    "channels": 1
+  },
+  "torch": "2.14.0+cu130",
+  "device": "NVIDIA GeForce RTX 2060 with Max-Q Design",
+  "git_commit": "0db074af7a447e00c1baba7bf49b2160f98615b5"
+}

@@ -32,6 +32,7 @@ Thumbs.db
 
 # Caches
 .matplotlib_cache/
+cache_entrenamiento/
 
 # CSV generados localmente
 *.csv
