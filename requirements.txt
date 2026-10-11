@@ -1,3 +1,9 @@
+# torch con CUDA 12.8 se descarga del indice de PyTorch; el resto, de PyPI.
+# La misma instalacion corre en GPU y en CPU (sin GPU, torch usa la CPU).
+# En macOS no hay build CUDA y pip instala el torch normal de PyPI.
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+torch==2.11.0
 numpy==2.2.6
 pandas==2.2.3
 SimpleITK==2.5.2
@@ -7,3 +13,7 @@ scipy==1.15.3
 matplotlib==3.10.6
 scikit-learn==1.7.2
 scikit-image==0.26.0
+
+# Notebooks: kernel de Jupyter y nbformat (Plotly lo necesita para mostrar la malla 3D)
+ipykernel==7.1.0
+nbformat==5.10.4

@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from distancias_fragmentos import measure_fragment_separations
+from src.distancias_fragmentos import measure_fragment_separations
 
 
 class MeasureFragmentSeparationsTests(unittest.TestCase):

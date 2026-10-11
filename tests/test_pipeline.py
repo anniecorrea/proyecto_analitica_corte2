@@ -18,9 +18,9 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from distancias_fragmentos import measure_fragment_separations  # noqa: E402
-from pertenencia import PertenenciaHead, clase_de_id  # noqa: E402
-from pipeline_pengwin import (COLUMNAS_FRAGMENTOS, evaluar_pertenencia, inferir_cortes,  # noqa: E402
+from src.distancias_fragmentos import measure_fragment_separations  # noqa: E402
+from src.pertenencia import PertenenciaHead, clase_de_id  # noqa: E402
+from src.pipeline_pengwin import (COLUMNAS_FRAGMENTOS, evaluar_pertenencia, inferir_cortes,  # noqa: E402
                               inferir_volumen, resumen_evaluacion_pertenencia)
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))       # para importar los módulos de la raíz
-from deteccion_grid import NMS_CONFIG, decode_predictions, nms_por_clase, postprocess  # noqa: E402
+from src.deteccion_grid import NMS_CONFIG, decode_predictions, nms_por_clase, postprocess  # noqa: E402
 
 try:
     import torchvision
