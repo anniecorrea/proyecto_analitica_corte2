@@ -21,6 +21,20 @@ def _target_names(node):
     return names
 
 
+def _segmento(source, node):
+    """Como ast.get_source_segment, pero sin perder los decoradores de funciones y clases.
+
+    ast.get_source_segment empieza en la linea del `def`, asi que `@torch.no_grad()` se perdia y la funcion
+    cargada calculaba gradientes (mas memoria y mas lenta en evaluacion). Solo se usa con nodos de nivel superior.
+    """
+    decoradores = getattr(node, "decorator_list", None)
+    if not decoradores:
+        return ast.get_source_segment(source, node)
+    lineas = source.splitlines(keepends=True)
+    inicio = min(d.lineno for d in decoradores) - 1
+    return "".join(lineas[inicio:node.end_lineno]).rstrip("\n")
+
+
 def cargar_definiciones(notebooks, definiciones, valores=(), destino=None):
     """Ejecuta en `destino` (el `globals()` del notebook) las definiciones pedidas.
 
@@ -54,7 +68,7 @@ def cargar_definiciones(notebooks, definiciones, valores=(), destino=None):
                 name = getattr(node, "name", None)
                 if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
                         and name in wanted_defs and name not in found_defs):
-                    cell_snippets.append(ast.get_source_segment(source, node))
+                    cell_snippets.append(_segmento(source, node))
                     found_defs.add(name)
                 elif isinstance(node, (ast.Assign, ast.AnnAssign)):
                     selected = _target_names(node) & wanted_values

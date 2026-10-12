@@ -33,6 +33,7 @@ Orden de ejecucion (la tabla va de arriba hacia abajo):
 | `Entrenamiento_overfiting` | Prueba de memorizacion (semana 9) | `modelos/` y `metricas/entrenamiento_overfiting/` |
 | `Entrenamiento_multitarea` | Entrenamiento por etapas A/B/C | `modelos/`, `metricas/` y `figuras/entrenamiento_multitarea/` |
 | `nms_pertenencia_pipeline` | NMS por clase, cabeza de pertenencia, pipeline completo | `modelos/`, `metricas/` y `figuras/nms_pertenencia/` |
+| `Negativos_ajuste` | Ajuste fino con cortes sin pelvis (negativos), elegido con `val` | `datos/targets/manifest_cortes_negativos.csv`, `modelos/`, `metricas/` y `figuras/entrenamiento_negativos/` |
 
 ## Estructura
 
@@ -142,6 +143,21 @@ streamlit run app/streamlit_app.py
 
 Las funciones del pipeline no se copian: `app/inferencia.py` las carga por nombre desde los cuadernos, igual que
 `salida_3d.ipynb`. El limite de carga se sube a 1 GB en `.streamlit/config.toml`.
+
+## Cortes sin pelvis (negativos)
+
+El entrenamiento original solo uso cortes con pelvis (`manifest_cortes_positivos.csv`). Al recorrer un volumen
+completo, los cortes de arriba y de abajo (femures, columna) reciben cajas: con el modelo 2.5D, en `val` 229 de 394
+cortes sin pelvis tienen alguna caja y 212 pasan `umbral_corte = 0.08` (el del modelo de 1 canal dejaba pasar 190 con 0.45). La mAP y el Dice no lo muestran porque se
+calculan solo sobre cortes positivos.
+
+`notebooks/Negativos_ajuste.ipynb` ajusta el modelo actual mezclando cortes sin un solo voxel de pelvis, compara dos
+proporciones y elige con `val` segun una regla escrita antes de entrenar (`src/cortes_vacios.CRITERIO`): menos
+cortes vacios que pasan, sin bajar la mAP@0.50 ni el Dice mas de 0.01 y conservando al menos el 99 % de los cortes
+con pelvis. Primero se corre con `SMOKE_TEST = True`; el modelo solo se adopta a mano (`ADOPTAR = True`) y despues
+hay que repetir `nms_pertenencia_pipeline` y `salida_3d`.
+
+Pruebas sin GPU: `python -m unittest tests.test_cortes_vacios -v`.
 
 ## Evaluacion integrada
 
