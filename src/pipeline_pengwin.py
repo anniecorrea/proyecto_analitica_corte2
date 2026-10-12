@@ -37,6 +37,10 @@ REGLAS DOCUMENTADAS
   * Una instancia que no cae dentro de ninguna caja final se CONSERVA y se marca sin_caja (no se borran
     fragmentos reales para que la salida se vea mejor).
   * Toda salida vacía conserva su forma: cajas [0,4], máscaras en ceros, listas vacías. Nunca None.
+  * Filtro de cortes (opcional, `umbral_corte`): el modelo se entrenó solo con cortes que tienen hueso pélvico. Al
+    recorrer un volumen completo, un corte cuya mejor caja después del NMS no llega a `umbral_corte` se marca
+    `procesado=False` y NO pasa por el decoder: sale sin instancias. Con `umbral_corte=None` (por defecto) se
+    procesan todos los cortes. El umbral se calibra con `val` (`calibrar_umbral_corte`), nunca con `test`.
 """
 import numpy as np
 import pandas as pd
@@ -52,6 +56,7 @@ CONFIG_PIPELINE = {
     "min_center_distance": 7,
     "min_instance_pixels": 1,             # no se borran fragmentos pequeños
     "output_size": (256, 256),
+    "umbral_corte": None,                 # None = procesar todos los cortes; float = filtro de cortes sin hueso
 }
 
 COMPONENTES_CORTE = ("backbone", "det_head", "seg_decoder", "cls_head", "features_fn", "priors_fn", "decode_fn")
@@ -83,6 +88,13 @@ def _caja_que_contiene(mask, boxes, labels):
         if n > mejor_n:
             mejor, mejor_n = k, n
     return mejor, (int(labels[mejor]) if mejor >= 0 else 0)
+
+
+def _corte_procesado(final_b, score_max, umbral_corte):
+    """Un corte pasa al decoder si el filtro está apagado (None) o si tiene caja final con score >= umbral."""
+    if umbral_corte is None:
+        return True
+    return final_b["boxes"].shape[0] > 0 and score_max >= float(umbral_corte)
 
 
 def _poner_en_eval(componentes):
@@ -123,17 +135,29 @@ def inferir_cortes(componentes, images, cfg=None):
     final = postprocess(det_out, score_thresh=cfg["score_thresh"], nms_fn=nms_por_clase,
                         iou_thresh=cfg["iou_thresh"], max_det_per_class=cfg["max_det_per_class"])
 
-    priors = componentes["priors_fn"](final, output_size=cfg["output_size"], device=images.device)
-    seg_out = componentes["seg_decoder"](images, feats, priors, output_size=cfg["output_size"])
+    # Compuerta por corte: solo pasan al decoder los cortes cuya mejor caja final supera umbral_corte.
+    score_max = [float(f["scores"].max()) if f["scores"].numel() else 0.0 for f in final]
+    procesado = [_corte_procesado(f, s, cfg["umbral_corte"]) for f, s in zip(final, score_max)]
+    idx = [b for b in range(B) if procesado[b]]
 
-    inst_masks, sem_masks, sem_classes = [], [], []
-    for b in range(B):
-        dec = componentes["decode_fn"](seg_out, center_threshold=cfg["center_threshold"],
-                                       min_center_distance=cfg["min_center_distance"],
-                                       min_instance_pixels=cfg["min_instance_pixels"], batch_index=b)
-        inst_masks.append(np.asarray(dec[0]).astype(np.uint16))
-        sem_masks.append(np.asarray(dec[1]).astype(np.uint8))
-        sem_classes.append(dict(dec[2]))
+    H, W = cfg["output_size"]
+    inst_masks = [np.zeros((H, W), dtype=np.uint16) for _ in range(B)]
+    sem_masks = [np.zeros((H, W), dtype=np.uint8) for _ in range(B)]
+    sem_classes = [{} for _ in range(B)]
+    if idx:
+        sel = torch.tensor(idx, device=images.device)
+        feats_sel = [f.index_select(0, sel) if torch.is_tensor(f) else f for f in feats]
+        priors = componentes["priors_fn"]([final[b] for b in idx], output_size=cfg["output_size"],
+                                          device=images.device)
+        seg_out = componentes["seg_decoder"](images.index_select(0, sel), feats_sel, priors,
+                                             output_size=cfg["output_size"])
+        for j, b in enumerate(idx):
+            dec = componentes["decode_fn"](seg_out, center_threshold=cfg["center_threshold"],
+                                           min_center_distance=cfg["min_center_distance"],
+                                           min_instance_pixels=cfg["min_instance_pixels"], batch_index=j)
+            inst_masks[b] = np.asarray(dec[0]).astype(np.uint16)
+            sem_masks[b] = np.asarray(dec[1]).astype(np.uint8)
+            sem_classes[b] = dict(dec[2])
 
     probs = clasificar_instancias(componentes["cls_head"], f4, inst_masks)
 
@@ -158,7 +182,8 @@ def inferir_cortes(componentes, images, cfg=None):
                 "conflicto_caja": clase_caja not in (0, clase),
             })
         salida.append({"raw": _a_cpu(raw[b]), "final": fin, "instance_mask": inst,
-                       "semantic_mask": sem_masks[b], "class_map": class_map, "instancias": instancias})
+                       "semantic_mask": sem_masks[b], "class_map": class_map, "instancias": instancias,
+                       "score_max": score_max[b], "procesado": procesado[b]})
     return salida
 
 
@@ -201,7 +226,8 @@ def inferir_volumen(componentes, volume_hu_zyx, spacing_xyz, cfg=None, batch_siz
             area_z.append({i: int((inst == i).sum()) for i in ids_presentes})
             filas_cortes.append({
                 "case_id": case_id, "z": z, "n_cajas_raw": int(r["raw"]["boxes"].shape[0]),
-                "n_cajas_final": int(r["final"]["boxes"].shape[0]), "n_instancias": len(r["instancias"]),
+                "n_cajas_final": int(r["final"]["boxes"].shape[0]), "score_max": r["score_max"],
+                "procesado": r["procesado"], "n_instancias": len(r["instancias"]),
                 "n_sin_caja": sum(d["sin_caja"] for d in r["instancias"]),
                 "n_conflicto_semantica": sum(d["conflicto_semantica"] for d in r["instancias"]),
                 "n_conflicto_caja": sum(d["conflicto_caja"] for d in r["instancias"]),
@@ -216,6 +242,49 @@ def inferir_volumen(componentes, volume_hu_zyx, spacing_xyz, cfg=None, batch_siz
     return {"case_id": case_id, "spacing_xyz": tuple(float(s) for s in spacing_xyz),
             "instance_volume": np.asarray(volume_ids).astype(np.int32), "region_by_id": region_by_id,
             "fragmentos": fragmentos, "cortes": pd.DataFrame(filas_cortes), "eventos": list(eventos)}
+
+
+@torch.no_grad()
+def scores_por_corte(componentes, images, cfg=None):
+    """Mejor score después del NMS en cada corte (0.0 si no queda ninguna caja). Solo usa tronco + cabeza grid:
+    es lo que decide el filtro de cortes, sin pasar por el decoder. images [B,1,H,W] -> np.ndarray [B]."""
+    _revisar(componentes, ("backbone", "det_head", "features_fn"))
+    cfg = _cfg(cfg)
+    _poner_en_eval(componentes)
+    if images.shape[0] == 0:
+        return np.zeros(0, dtype=np.float32)
+    feats = list(componentes["features_fn"](componentes["backbone"], images))
+    f4 = feats[-1]
+    if componentes.get("cbam") is not None:
+        refinado = componentes["cbam"](f4)
+        f4 = refinado[0] if isinstance(refinado, tuple) else refinado
+    final = postprocess(componentes["det_head"](f4), score_thresh=cfg["score_thresh"], nms_fn=nms_por_clase,
+                        iou_thresh=cfg["iou_thresh"], max_det_per_class=cfg["max_det_per_class"])
+    return np.array([float(f["scores"].max()) if f["scores"].numel() else 0.0 for f in final], dtype=np.float32)
+
+
+def calibrar_umbral_corte(scores, tiene_hueso, recall_min=0.99, paso=0.01):
+    """Elige umbral_corte con cortes de val etiquetados (tiene_hueso = el label del corte tiene algún vóxel de pelvis).
+    Regla: el MAYOR umbral que conserva al menos `recall_min` de los cortes con hueso. Se prioriza no perder cortes
+    con hueso (un corte omitido borra sus fragmentos) sobre descartar cortes vacíos.
+    Devuelve (umbral, tabla) con, para cada umbral candidato: recall_hueso (cortes con hueso que se procesan)
+    y rechazo_vacios (cortes sin hueso que se omiten)."""
+    scores = np.asarray(scores, dtype=np.float64).reshape(-1)
+    pos = np.asarray(tiene_hueso, dtype=bool).reshape(-1)
+    if scores.shape != pos.shape:
+        raise ValueError("scores y tiene_hueso deben tener la misma longitud")
+    if not pos.any():
+        raise ValueError("Se necesita al menos un corte con hueso para calibrar")
+    filas = []
+    for u in np.round(np.arange(0.0, 1.0 + 1e-9, paso), 6):
+        procesa = (scores > 0) & (scores >= u)          # igual que _corte_procesado: sin cajas = no se procesa
+        filas.append({"umbral": float(u), "recall_hueso": float(procesa[pos].mean()),
+                      "rechazo_vacios": float((~procesa[~pos]).mean()) if (~pos).any() else float("nan"),
+                      "cortes_procesados": int(procesa.sum())})
+    tabla = pd.DataFrame(filas)
+    validos = tabla[tabla["recall_hueso"] >= recall_min]
+    umbral = float(validos["umbral"].max()) if len(validos) else 0.0
+    return umbral, tabla
 
 
 def agregar_pertenencia_3d(slice_maps, probs_z, area_z, volume_classes=None, case_id=None):

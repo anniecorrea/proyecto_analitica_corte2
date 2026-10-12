@@ -20,8 +20,9 @@ import torch.nn as nn
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.distancias_fragmentos import measure_fragment_separations  # noqa: E402
 from src.pertenencia import PertenenciaHead, clase_de_id  # noqa: E402
-from src.pipeline_pengwin import (COLUMNAS_FRAGMENTOS, evaluar_pertenencia, inferir_cortes,  # noqa: E402
-                              inferir_volumen, resumen_evaluacion_pertenencia)
+from src.pipeline_pengwin import (COLUMNAS_FRAGMENTOS, calibrar_umbral_corte, evaluar_pertenencia,  # noqa: E402
+                              inferir_cortes, inferir_volumen, resumen_evaluacion_pertenencia,
+                              scores_por_corte)
 
 
 # ------------------------------------------------------------------ piezas simuladas (mismo contrato)
@@ -262,6 +263,112 @@ class Evaluacion(unittest.TestCase):
         df = evaluar_pertenencia(comp, imagenes(0), self.targets, modo="pred")
         self.assertTrue((df["pred_cabeza"] == 0).all())
         self.assertIsInstance(resumen_evaluacion_pertenencia(df), pd.DataFrame)
+
+
+# ------------------------------------------------------------------ filtro de cortes sin hueso
+def features_con_z(backbone, x):
+    """Como features_falsas, pero copia el z (píxel [0,0] de la imagen) en f4 para que el detector lo lea."""
+    B = x.shape[0]
+    f4 = x.new_zeros(B, 256, 16, 16)
+    f4[:, 0, 0, 0] = x[:, 0, 0, 0]
+    return [x.new_zeros(B, 32, 128, 128), x.new_zeros(B, 64, 64, 64), x.new_zeros(B, 128, 32, 32), f4]
+
+
+class DetectorSegunZ(nn.Module):
+    """Devuelve las cajas de logits_sacro_duplicado_y_coxal solo en los cortes de `zs_con_cajas`; el resto, nada."""
+    def __init__(self, zs_con_cajas):
+        super().__init__()
+        self.dummy = nn.Parameter(torch.zeros(1))
+        self.zs = set(zs_con_cajas)
+
+    def forward(self, f4):
+        out = torch.full((f4.shape[0], 8, 16, 16), -10.0, device=f4.device)
+        for b in range(f4.shape[0]):
+            if int(round(float(f4[b, 0, 0, 0]))) in self.zs:
+                out[b] = logits_sacro_duplicado_y_coxal()[0].to(f4.device)
+        return out
+
+
+def mascara_id3():
+    m = np.zeros((256, 256), dtype=np.int64)
+    m[10:30, 10:30] = 3
+    return m
+
+
+class FiltroDeCortes(unittest.TestCase):
+    def test_apagado_por_defecto_procesa_todo(self):
+        m = mascara_id3()
+        r = inferir_cortes(componentes(mascaras_por_z={0: m}), imagenes(0))[0]
+        self.assertTrue(r["procesado"])
+        self.assertEqual(r["score_max"], 0.0)
+        self.assertEqual(len(r["instancias"]), 1)                      # sin filtro, igual que antes
+
+    def test_corte_sin_cajas_no_pasa_al_decoder(self):
+        comp = componentes(mascaras_por_z={0: mascara_id3()})
+        r = inferir_cortes(comp, imagenes(0), cfg={"umbral_corte": 0.0})[0]
+        self.assertFalse(r["procesado"])
+        self.assertEqual(r["instancias"], [])
+        self.assertEqual(r["instance_mask"].shape, (256, 256))           # la forma se conserva
+        self.assertEqual(int(r["instance_mask"].max()), 0)
+        self.assertIsNone(comp["seg_decoder"].ultimos_priors)          # el decoder ni siquiera se llamó
+
+    def test_umbral_decide_si_se_procesa(self):
+        comp = componentes(logits_sacro_duplicado_y_coxal(), {0: fragmentos_en_cajas()})
+        alto = inferir_cortes(comp, imagenes(0), cfg={"umbral_corte": 0.9999})[0]
+        bajo = inferir_cortes(comp, imagenes(0), cfg={"umbral_corte": 0.5})[0]
+        self.assertGreater(bajo["score_max"], 0.5)
+        self.assertFalse(alto["procesado"])
+        self.assertEqual(alto["instancias"], [])
+        self.assertEqual(alto["final"]["boxes"].shape[0], 2)           # las cajas se siguen reportando
+        self.assertTrue(bajo["procesado"])
+        self.assertEqual(sorted(d["id"] for d in bajo["instancias"]), [1, 12, 25])
+
+    def test_lote_mezclado_respeta_el_orden(self):
+        comp = componentes(mascaras_por_z={0: mascara_id3(), 1: fragmentos_en_cajas(), 2: mascara_id3()})
+        comp["features_fn"], comp["det_head"] = features_con_z, DetectorSegunZ({1})
+        res = inferir_cortes(comp, imagenes(0, 1, 2), cfg={"umbral_corte": 0.0})
+        self.assertEqual([r["procesado"] for r in res], [False, True, False])
+        self.assertEqual([len(r["instancias"]) for r in res], [0, 3, 0])
+        self.assertEqual(sorted(d["id"] for d in res[1]["instancias"]), [1, 12, 25])   # la máscara del corte 1
+        self.assertEqual(comp["seg_decoder"].ultimos_priors.shape[0], 1)  # el decoder solo vio un corte
+
+    def test_volumen_registra_score_y_procesado(self):
+        v = np.zeros((3, 256, 256), dtype=np.float32)
+        for z in range(3):
+            v[z, 0, 0] = z
+        comp = componentes(mascaras_por_z={z: mascara_id3() for z in range(3)})
+        comp["features_fn"], comp["det_head"] = features_con_z, DetectorSegunZ({1})
+        out = inferir_volumen(comp, v, (0.8, 0.8, 1.5), cfg={"umbral_corte": 0.0}, batch_size=2, case_id="002")
+        cortes = out["cortes"]
+        self.assertEqual(cortes["procesado"].tolist(), [False, True, False])
+        self.assertTrue((cortes.loc[[0, 2], "score_max"] == 0.0).all())
+        self.assertEqual(int(out["fragmentos"]["n_cortes"].max()), 1)  # el fragmento 3 solo existe en el corte 1
+
+    def test_scores_por_corte(self):
+        comp = componentes()
+        comp["features_fn"], comp["det_head"] = features_con_z, DetectorSegunZ({1})
+        s = scores_por_corte(comp, imagenes(0, 1))
+        self.assertEqual(s.shape, (2,))
+        self.assertEqual(float(s[0]), 0.0)
+        self.assertGreater(float(s[1]), 0.5)
+        self.assertEqual(scores_por_corte(comp, torch.zeros(0, 1, 256, 256)).shape, (0,))
+
+    def test_calibracion_prioriza_no_perder_hueso(self):
+        scores = [0.9, 0.8, 0.7, 0.3, 0.0, 0.1, 0.2]
+        hueso = [True, True, True, True, False, False, False]
+        u, tabla = calibrar_umbral_corte(scores, hueso, recall_min=0.75)
+        self.assertAlmostEqual(u, 0.7)                                 # 3 de 4 cortes con hueso
+        fila = tabla.set_index("umbral").loc[u]
+        self.assertAlmostEqual(fila["recall_hueso"], 0.75)
+        self.assertAlmostEqual(fila["rechazo_vacios"], 1.0)
+        u_total, _ = calibrar_umbral_corte(scores, hueso, recall_min=1.0)
+        self.assertAlmostEqual(u_total, 0.3)                           # no se pierde ningún corte con hueso
+
+    def test_calibracion_valida_entradas(self):
+        with self.assertRaises(ValueError):
+            calibrar_umbral_corte([0.5, 0.2], [True])
+        with self.assertRaises(ValueError):
+            calibrar_umbral_corte([0.5, 0.2], [False, False])
 
 
 if __name__ == "__main__":

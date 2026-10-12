@@ -1,0 +1,17 @@
+{
+  "umbral_corte": 0.45,
+  "recall_min_hueso": 0.99,
+  "calibrado_con": "val",
+  "casos": [
+    "035",
+    "037",
+    "067",
+    "071",
+    "079"
+  ],
+  "cortes": 1662,
+  "cortes_con_hueso": 1268,
+  "recall_hueso": 0.9905362776025236,
+  "rechazo_vacios": 0.5177664974619289,
+  "tronco": "modelo_multitarea_final.pt"
+}

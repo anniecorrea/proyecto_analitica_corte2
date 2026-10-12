@@ -1,0 +1,7 @@
+{
+  "tronco": "modelo_multitarea_final.pt",
+  "tronco_sha256_16": "ec09dfdd999d57fb",
+  "mejor_epoca": 7,
+  "val_f1_macro": 0.9508774133543794,
+  "val_auc_macro_ovr": 0.9934978776596122
+}
