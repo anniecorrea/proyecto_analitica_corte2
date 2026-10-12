@@ -11,7 +11,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from pertenencia import (PertenenciaHead, cargar_submodulo, clase_de_id, clasificar_instancias,  # noqa: E402
+from src.pertenencia import (PertenenciaHead, cargar_submodulo, clase_de_id, clasificar_instancias,  # noqa: E402
                          entrenar_pertenencia, instancias_de_mascara, metricas_pertenencia, pesos_de_mascaras,
                          perdida_pertenencia, pesos_por_clase, precalcular_cache_pertenencia, predecir_cache,
                          rasgos_geometricos, regla_caja_detectada, regla_mayoria_semantica, targets_pertenencia)

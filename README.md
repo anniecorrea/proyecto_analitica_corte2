@@ -5,36 +5,65 @@ fracturas pelvicas a partir de tomografia computarizada.
 
 ## Regla de organizacion
 
-Todo el proyecto se construye de forma acumulativa en un unico notebook:
+El pipeline se divide en notebooks dentro de `notebooks/`, uno por etapa. Cada
+notebook se ejecuta por separado: lee los archivos que genera el anterior
+(`splits/dataset.csv`, el manifiesto de cortes positivos, etc.) en lugar de
+depender de lo que haya en memoria, y carga por nombre las clases y funciones
+compartidas desde el notebook donde viven
+(`src.definiciones_notebooks.cargar_definiciones`).
 
-```text
-proyecto_pengwin.ipynb
-```
+El codigo reutilizable y los scripts que se ejecutan fuera de los notebooks
+viven en `src/`. Todo lo que se genera va a `resultados/`, ordenado por tipo de
+archivo; `src/rutas.py` define esas carpetas en un solo lugar.
 
-Cada avance agrega nuevas secciones al mismo archivo. No se crean notebooks ni
-carpetas separadas por semana o por entrega.
+Orden de ejecucion (la tabla va de arriba hacia abajo):
+
+| Notebook | Contenido | Genera en `resultados/` |
+|---|---|---|
+| `Dataset_splits` | Verificacion CT-label, dataset curado, splits 75/5/20 | `splits/` (fuera de `resultados/`) |
+| `Ventaneo_hu` | Ventaneo HU y realce Otsu + CLAHE | — |
+| `EDA` | Fragmentos por region, volumenes, fragmento principal | `datos/fragmentos/` |
+| `Distancias_referencia` | Distancia 3D de cada fragmento al principal | `datos/distancias_referencia.csv` |
+| `Visualizacion_3d` | MIP en tres vistas y malla 3D interactiva | `html/` |
+| `Targets_deteccion` | Cajas por region, manifiesto, `PengwinDetectionDataset` | `datos/targets/`, `figuras/targets/`, `modelos/batch_fijo.pt` |
+| `Backbone` | Backbone FundidoraPC (`base` y `plus`) y sus pruebas | — |
+| `cbam` | CBAM y compuerta residual | — |
+| `Cabeza_grid` | Cabeza de deteccion grid y perdidas | — |
+| `Segmentacion_instancias` | Decoder con skips, centros/offsets, metricas, SAM | — |
+| `Entrenamiento_overfiting` | Prueba de memorizacion (semana 9) | `modelos/` y `metricas/entrenamiento_overfiting/` |
+| `Entrenamiento_multitarea` | Entrenamiento por etapas A/B/C | `modelos/`, `metricas/` y `figuras/entrenamiento_multitarea/` |
+| `nms_pertenencia_pipeline` | NMS por clase, cabeza de pertenencia, pipeline completo | `modelos/`, `metricas/` y `figuras/nms_pertenencia/` |
 
 ## Estructura
 
 ```text
 .
-|-- proyecto_pengwin.ipynb
+|-- notebooks/            # un notebook por etapa
+|-- src/                  # modulos del pipeline, evaluacion.py y rutas.py
+|-- tests/
+|-- resultados/           # todo lo generado, por tipo de archivo
+|   |-- datos/            # CSV que leen otros notebooks
+|   |-- metricas/         # historiales de entrenamiento y tablas de resultados
+|   |-- figuras/          # PNG, una subcarpeta por etapa
+|   |-- html/             # visualizadores interactivos
+|   |-- modelos/          # pesos .pth/.pt (se suben con Git LFS)
+|   `-- cache/            # cache del entrenamiento (no se sube a GitHub)
+|-- splits/
+|-- data_mha/
 |-- README.md
 |-- requirements.txt
 |-- IA_USAGE.md
-|-- Proyecto_Corte2_PENGWIN.docx
-|-- data_mha/
-|-- splits/
-`-- evidencias/
+`-- Proyecto_Corte2_PENGWIN.docx
 ```
 
 - `data_mha/`: datos pesados locales; no se suben a GitHub.
 - `splits/`: particion fija por paciente `75/5/20`, semilla 42.
-- `evidencias/`: archivos generados por el notebook, organizados por funcion.
+- Dentro de `metricas/`, `figuras/` y `modelos/` cada etapa usa el mismo nombre
+  de subcarpeta: lo de `nms_pertenencia` esta en las tres bajo ese nombre.
 
 ## Datos locales
 
-La carpeta debe estar junto al notebook:
+La carpeta debe estar en la raiz del repositorio:
 
 ```text
 data_mha/
@@ -69,25 +98,54 @@ python -m pip install --no-cache-dir -r requirements.txt
 ## Ejecucion
 
 1. Abrir la carpeta del repositorio en Visual Studio Code.
-2. Abrir `proyecto_pengwin.ipynb`.
+2. Abrir los notebooks de `notebooks/` en el orden de la tabla de arriba.
 3. Seleccionar el kernel del ambiente `.venv`.
-4. Pulsar **Run All**.
+4. Pulsar **Run All** en cada uno.
 
-El notebook comprueba los 100 pares CT-label, genera los splits, ejecuta el EDA,
-aplica ventaneo HU, crea el visualizador MIP y la malla 3D, y prepara los
-targets de deteccion con bounding boxes. También calcula la distancia de
-referencia entre fragmentos de las máscaras MHA y genera la tabla
-`evidencias/distancias_referencia.csv`.
+En un repositorio recien clonado, `splits/` y los CSV de `resultados/` ya
+vienen versionados, asi que cualquier notebook puede ejecutarse sin correr los
+anteriores. Los pesos de `resultados/modelos/` tambien vienen en el repositorio,
+pero por Git LFS (son archivos grandes): instalar Git LFS una vez y descargarlos.
+
+```bash
+git lfs install
+git lfs pull
+```
+
+Sin ese paso, los `.pth`/`.pt` quedan como punteros de texto de unos pocos bytes y
+`torch.load` falla. No se suben los `last_*.pth` (solo sirven para reanudar un
+entrenamiento) ni la cache de `resultados/cache/`.
 
 Para regenerar las capturas de revisión de distancia desde la raíz del
 repositorio, después de tener los datos locales instalados:
 
 ```bash
-python3 generar_evidencias_distancias.py
+python -m src.generar_evidencias_distancias
 ```
 
 Las capturas son proyecciones 2D para inspección; el valor de distancia se
 calcula en 3D con el espaciado físico del archivo MHA.
+
+## Evaluacion integrada
+
+Cuando la etapa `C_conjunto` haya terminado, exporta `modelo_multitarea_final.pt`
+desde `notebooks/Entrenamiento_multitarea.ipynb` y ejecuta desde la raiz:
+
+```bash
+python -m src.evaluacion --nms-function src.deteccion_grid:nms_por_clase --sam-checkpoint ruta\sam_vit_b.pth --device auto
+```
+
+La comparacion con SAM corre solo sobre `test`, usando las cajas predichas como
+prompts. El checkpoint SAM es opcional; sin el, se evalua el modelo propio y el
+reporte deja constancia de que SAM no se ejecuto. Las metricas y los resultados
+por corte quedan en `resultados/metricas/evaluacion/`, y los ejemplos de
+acierto/error en `resultados/figuras/evaluacion/`.
+Usa `--device cpu` o `--device cuda` para medir cada escenario por separado.
+El manifiesto actual contiene cortes positivos, por lo que los resultados se
+interpretan sobre esos cortes y no sobre cortes vacios del volumen.
+F1/AUC miden presencia de cada region por corte; Dice/IoU del modelo se calculan
+por fragmento con emparejamiento uno-a-uno dentro de su region. La comparacion
+SAM se reporta por region, usando las mismas cajas predichas como prompts.
 
 ## Resultados actuales
 

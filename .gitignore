@@ -34,16 +34,21 @@ Thumbs.db
 # Caches
 .matplotlib_cache/
 cache_entrenamiento/
+resultados/cache/
 
 # CSV generados localmente
 *.csv
 
-# Permitir CSV ligeros de splits/evidencia
+# Permitir CSV ligeros de splits y resultados
 !splits/*.csv
-!evidencias/**/*.csv
+!resultados/**/*.csv
 
-# Checkpoint descomprimido y pesos: se comparten fuera del repositorio
-evidencias/entrenamiento_multitarea/best_C_conjunto/
+# Pesos que se comparten con el equipo, via Git LFS (ver .gitattributes)
+!resultados/modelos/**/*.pth
+!resultados/modelos/**/*.pt
+# last_*.pth solo sirven para reanudar un entrenamiento; las corridas smoke son de prueba
+resultados/modelos/**/last_*.pth
+resultados/modelos/*_smoke/
 
 # Archivos temporales de Word
 ~$*
