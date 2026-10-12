@@ -1,0 +1,17 @@
+gt_id,pred_id,region,iou_3d,gt_distance_mm,pred_distance_mm,abs_error_mm,gt_is_main,main_ok,caso
+1,6,sacro,0.716,0.0,0.0,0.0,True,True,035
+11,11,coxal_izquierdo,0.689,0.0,0.0,0.0,True,True,035
+21,10,coxal_derecho,0.518,0.0,0.0,0.0,True,True,035
+1,11,sacro,0.634,0.0,0.0,0.0,True,True,037
+11,4,coxal_izquierdo,0.771,0.0,0.0,0.0,True,True,037
+21,6,coxal_derecho,0.56,0.0,0.0,0.0,True,True,037
+1,10,sacro,0.646,0.0,0.0,0.0,True,True,067
+11,6,coxal_izquierdo,0.724,0.0,0.0,0.0,True,True,067
+21,11,coxal_derecho,0.66,0.0,0.0,0.0,True,True,067
+1,10,sacro,0.577,0.0,0.0,0.0,True,True,071
+11,6,coxal_izquierdo,0.79,0.0,0.0,0.0,True,True,071
+21,1,coxal_derecho,0.659,0.0,0.0,0.0,True,True,071
+1,6,sacro,0.847,0.0,0.0,0.0,True,True,079
+11,3,coxal_izquierdo,0.713,0.0,0.0,0.0,True,True,079
+21,1,coxal_derecho,0.714,0.0,0.0,0.0,True,True,079
+22,5,coxal_derecho,0.58,0.0,0.0,0.0,False,True,079

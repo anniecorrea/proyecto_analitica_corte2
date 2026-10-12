@@ -1,0 +1,36 @@
+{
+  "config": {
+    "decode": {
+      "center_threshold": 0.4,
+      "min_center_distance": 7,
+      "min_instance_pixels": 9,
+      "fallback_components": true,
+      "det_gate": 0.4,
+      "gate_min_run": 3,
+      "box_margin": 2
+    },
+    "link": {
+      "min_overlap": 0.05,
+      "overlap_mode": "iou",
+      "max_gap": 2,
+      "many_to_one": true
+    },
+    "post": {
+      "min_slices": 5,
+      "min_voxels": 500,
+      "min_score": 0.0,
+      "absorb_max_voxels": 1000
+    }
+  },
+  "creado": "2026-10-12 11:00",
+  "modelo": "modelo_multitarea_final.pt (etapa C_conjunto, época 7)",
+  "casos_de_ajuste": [
+    "035",
+    "037",
+    "067",
+    "071",
+    "079"
+  ],
+  "stride_de_ajuste": 2,
+  "criterio": "F1 por fragmento 3D, IoU>=0.5, conteos sumados de todos los casos de val"
+}
