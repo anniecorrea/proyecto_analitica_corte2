@@ -21,7 +21,6 @@ C:*/
 *.pt
 *.ckpt
 checkpoints/
-modelos_sam/
 
 # Jupyter checkpoints
 .ipynb_checkpoints/

@@ -4,6 +4,8 @@
 --extra-index-url https://download.pytorch.org/whl/cu128
 
 torch==2.11.0
+torchvision==0.26.0          # debe ir con torch 2.11; otra version obliga a pip a reemplazar torch por uno sin CUDA
+segment-anything==1.0        # solo para el baseline SAM (sam_baseline.ipynb)
 numpy==2.2.6
 pandas==2.2.3
 SimpleITK==2.5.2
