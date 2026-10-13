@@ -245,3 +245,75 @@ def evaluar_tramo_principal(tabla_scores, umbral, huecos=(0, 2, 5, 10)):
         filas.append({"max_hueco": h, "vacios_que_pasan_antes": fp_antes, "vacios_que_pasan_despues": fp_despues,
                       "cortes_pelvis_perdidos": pelvis_perdida, "n_cortes_pelvis": n_pelvis})
     return pd.DataFrame(filas)
+
+
+# --------------------------------------------------------------------------------------------------
+# 5. Estudios sin pelvis simulados y regla para elegir el modelo final
+# --------------------------------------------------------------------------------------------------
+def tramos_sin_pelvis(tiene_pelvis, min_cortes=1):
+    """Tramos del volumen ANTES y DESPUÉS del tramo con pelvis, para usarlos como estudios sin pelvis.
+    Devuelve [(posicion, inicio, fin_exclusivo)]. Los huecos dentro del tramo con pelvis no se usan.
+    Si el volumen no tiene pelvis, devuelve el volumen completo como un solo tramo ("todo")."""
+    p = np.asarray(tiene_pelvis, dtype=bool).reshape(-1)
+    n = p.size
+    z = np.flatnonzero(p)
+    if z.size == 0:
+        return [("todo", 0, n)] if n >= min_cortes else []
+    lo, hi = int(z.min()), int(z.max())
+    out = []
+    if lo >= min_cortes:
+        out.append(("antes", 0, lo))
+    if n - hi - 1 >= min_cortes:
+        out.append(("despues", hi + 1, n))
+    return out
+
+
+REGLA_FINAL = {
+    "tol_map50": 0.01,            # frente al original, la mAP@0.50 no baja más de 0,01
+    "tol_dice": 0.01,             # ni el Dice con cajas predichas
+    "recall_min": 0.99,           # se conserva al menos el 99 % de los cortes con pelvis
+    "tol_f1_3d": 0.04,            # F1 3D (salida reajustada) a lo sumo un fragmento (~0,04 con 27) por debajo del original
+    "frag_sin_pelvis_max": 0,     # el sistema completo (modelo + control) no entrega fragmentos en los estudios sin pelvis
+}
+
+
+def regla_modelo_final(candidatos, referencia, regla=REGLA_FINAL):
+    """Regla acordada para elegir el modelo final entre los candidatos con negativos.
+
+    candidatos: {nombre: {"map50", "dice", "recall_pelvis", "f1_3d", "frag_sin_pelvis_sistema", "frag_sin_pelvis_modelo"}}
+      frag_sin_pelvis_sistema: fragmentos entregados en los estudios sin pelvis con el control de pelvis activo.
+      frag_sin_pelvis_modelo: los mismos, sin el control (qué tan robusto es el modelo solo).
+    referencia: {"map50", "dice", "f1_3d"} del modelo original.
+    Un candidato es aceptable si cumple las tres condiciones. Entre los aceptables gana el de mayor F1 3D; si el
+    segundo está a <= tol_f1_3d, gana el que invente menos fragmentos sin el control (y si empatan, el de mayor F1).
+    Devuelve {"ganador", "aceptables", "detalle", "motivo"}; ganador None = ninguno es aceptable (decide el equipo)."""
+    claves = ("map50", "dice", "recall_pelvis", "f1_3d", "frag_sin_pelvis_sistema", "frag_sin_pelvis_modelo")
+    detalle = {}
+    for nombre, m in candidatos.items():
+        faltan = [k for k in claves if k not in m]
+        if faltan:
+            raise KeyError(f"{nombre}: faltan {faltan}")
+        c1 = (referencia["map50"] - m["map50"] <= regla["tol_map50"] + 1e-12
+              and referencia["dice"] - m["dice"] <= regla["tol_dice"] + 1e-12
+              and m["recall_pelvis"] >= regla["recall_min"] - 1e-12)
+        c2 = m["f1_3d"] >= referencia["f1_3d"] - regla["tol_f1_3d"] - 1e-12
+        c3 = m["frag_sin_pelvis_sistema"] <= regla["frag_sin_pelvis_max"]
+        detalle[nombre] = {"topes_2d": bool(c1), "f1_3d_ok": bool(c2), "sin_pelvis_ok": bool(c3),
+                           "aceptable": bool(c1 and c2 and c3),
+                           "caida_map50": float(referencia["map50"] - m["map50"]),
+                           "caida_dice": float(referencia["dice"] - m["dice"]),
+                           "diferencia_f1_3d": float(m["f1_3d"] - referencia["f1_3d"])}
+    aceptables = [n for n, d in detalle.items() if d["aceptable"]]
+    if not aceptables:
+        return {"ganador": None, "aceptables": [], "detalle": detalle,
+                "motivo": "Ningún candidato cumple las tres condiciones: se lleva la tabla al equipo."}
+    orden = sorted(aceptables, key=lambda n: -candidatos[n]["f1_3d"])
+    mejor = orden[0]
+    empatados = [n for n in orden if candidatos[mejor]["f1_3d"] - candidatos[n]["f1_3d"] <= regla["tol_f1_3d"] + 1e-12]
+    if len(empatados) == 1:
+        return {"ganador": mejor, "aceptables": aceptables, "detalle": detalle,
+                "motivo": f"Mayor F1 3D ({candidatos[mejor]['f1_3d']:.3f}) por más de un fragmento."}
+    ganador = min(empatados, key=lambda n: (candidatos[n]["frag_sin_pelvis_modelo"], -candidatos[n]["f1_3d"]))
+    return {"ganador": ganador, "aceptables": aceptables, "detalle": detalle,
+            "motivo": (f"F1 3D empatado dentro de un fragmento entre {empatados}: gana el que inventa menos fragmentos "
+                       f"sin el control ({candidatos[ganador]['frag_sin_pelvis_modelo']}).")}

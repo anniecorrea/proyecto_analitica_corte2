@@ -34,6 +34,8 @@ Orden de ejecucion (la tabla va de arriba hacia abajo):
 | `Entrenamiento_multitarea` | Entrenamiento por etapas A/B/C | `modelos/`, `metricas/` y `figuras/entrenamiento_multitarea/` |
 | `nms_pertenencia_pipeline` | NMS por clase, cabeza de pertenencia, pipeline completo | `modelos/`, `metricas/` y `figuras/nms_pertenencia/` |
 | `Negativos_ajuste` | Ajuste fino con cortes sin pelvis (negativos), elegido con `val` | `datos/targets/manifest_cortes_negativos.csv`, `modelos/`, `metricas/` y `figuras/entrenamiento_negativos/` |
+| `Entrenamiento_negativos_completo` | Entrenamiento A, B y C desde cero con los negativos | `modelos/`, `metricas/` y `figuras/entrenamiento_negativos_completo/` |
+| `Comparacion_final_negativos` | Original vs. ajustado vs. desde cero en 3D y en estudios sin pelvis; aplica la regla | `metricas/comparacion_final_negativos/` |
 
 ## Estructura
 
@@ -157,7 +159,23 @@ cortes vacios que pasan, sin bajar la mAP@0.50 ni el Dice mas de 0.01 y conserva
 con pelvis. Primero se corre con `SMOKE_TEST = True`; el modelo solo se adopta a mano (`ADOPTAR = True`) y despues
 hay que repetir `nms_pertenencia_pipeline` y `salida_3d`.
 
-Pruebas sin GPU: `python -m unittest tests.test_cortes_vacios -v`.
+Resultado del ajuste (val): los cortes vacios que pasan bajan de 212 a 172 sin cambio en mAP (0.864) ni Dice
+(0.944 -> 0.943); en 3D, con la configuracion congelada, el F1 por fragmento paso de 0.667 a 0.638 (20 fragmentos
+predichos frente a 18; reales 27).
+
+Como el sistema se va a probar con estudios que pueden no tener pelvis, el equipo decidio usar negativos y comparar
+dos candidatos con una regla fijada antes de entrenar (`src/cortes_vacios.regla_modelo_final`):
+
+1. `notebooks/Entrenamiento_negativos_completo.ipynb`: repite el entrenamiento original (etapas A, B y C, mismos
+   hiperparametros) con los 5.698 negativos de train desde la primera epoca. Revisa los topes en 2D.
+2. `notebooks/Comparacion_final_negativos.ipynb`: compara original, ajustado y desde cero en 3D, reajustando la
+   salida 3D para cada uno, y en los tramos sin pelvis de val tratados como estudios separados. Aplica la regla.
+
+Control de "pelvis presente" (`src/control_pelvis.py`, usado por el frontend): si los cortes con una caja de score
+>= 0.2 no forman un bloque continuo de al menos 80 mm, el estudio no tiene una pelvis completa y no se entregan
+fragmentos. En val, con pelvis el bloque mide 200 mm o mas; en los tramos sin pelvis, 32 mm como mucho.
+
+Pruebas sin GPU: `python -m unittest tests.test_cortes_vacios tests.test_control_pelvis -v`.
 
 ## Evaluacion integrada
 

@@ -94,7 +94,12 @@ for i, (c, nombre_region) in enumerate(regiones.items(), start=1):
     m[i].metric(nombre_region.replace("_", " ").capitalize(), int((tabla["class"] == c).sum()))
 m[4].metric("Tiempo", f"{res['segundos']:.0f} s")
 
-if len(tabla) == 0:
+pelvis = res.get("pelvis")
+if pelvis is not None and not pelvis["presente"]:
+    st.warning(inferencia.control_pelvis.MENSAJE_SIN_PELVIS)
+    st.caption(f"Bloque continuo más largo con detecciones: {pelvis['racha_mm']:.0f} mm "
+               f"(se exigen {pelvis['min_mm']:.0f} mm con score ≥ {pelvis['det_gate']:.2f}).")
+elif len(tabla) == 0:
     st.warning("El modelo no encontró fragmentos en este volumen.")
 
 lut = vis.tabla_de_colores(dict(zip(tabla["fragment_id"], tabla["class"])), colores, int(inst.max()))
@@ -130,5 +135,8 @@ d2.download_button("Descargar tabla (.csv)", tabla.to_csv(index=False).encode("u
 
 with st.expander("Detalles del pipeline"):
     st.write(f"Cortes con alguna caja detectada: {res['cortes_con_hueso']} de {Z}")
+    if pelvis is not None:
+        st.write(f"Control de pelvis: bloque continuo de {pelvis['racha_mm']:.0f} mm "
+                 f"(cortes {pelvis['inicio']} a {pelvis['fin']}); se exigen {pelvis['min_mm']:.0f} mm.")
     st.write("Limpieza 3D:", res["log_limpieza"])
     st.write(f"Eventos de fusión/división para revisar: {len(res['eventos'])}")

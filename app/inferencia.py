@@ -22,6 +22,7 @@ import SimpleITK as sitk
 import torch
 
 from definiciones_notebooks import cargar_definiciones
+import control_pelvis
 from rutas import METRICAS_DIR, MODELOS_DIR, NOTEBOOKS_DIR
 
 warnings.filterwarnings("ignore", message="'mode' parameter is deprecated")   # letterbox_pair usa mode= (Pillow 13)
@@ -89,16 +90,24 @@ def predecir_volumen(pipeline, volume_hu, image_itk, case_id="subido"):
     """Igual que predict_case_3d (salida_3d.ipynb) pero con el volumen ya leído. No usa ninguna etiqueta."""
     ns, comp, cfg = pipeline["ns"], pipeline["comp"], pipeline["cfg_3d"]
     t0 = time.time()
-    with torch.no_grad():                   # cargar_definiciones no copia decoradores: infer_case pierde su @torch.no_grad()
+    with torch.no_grad():
         bundle = ns["infer_case"](comp, case_id, volume=volume_hu, image_itk=image_itk, verbose=False)
-    result = ns["assemble_case"](bundle, cfg["decode"], cfg["link"], cfg["post"], stride=1)
     spacing = tuple(float(s) for s in image_itk.GetSpacing())
+    # Control de "pelvis presente" (src/control_pelvis.py): sin un bloque continuo de detecciones de al menos 80 mm,
+    # el estudio no tiene una pelvis completa y no se entregan fragmentos (evita inventarlos en otros huesos).
+    pelvis = control_pelvis.pelvis_presente_bundle(bundle, spacing[2])
+    if pelvis["presente"]:
+        result = ns["assemble_case"](bundle, cfg["decode"], cfg["link"], cfg["post"], stride=1)
+    else:
+        result = {"volume": np.zeros(volume_hu.shape, dtype=np.uint16), "events": [], "log": {},
+                  "table": pd.DataFrame(columns=["fragment_id", "class", "region", "n_voxels", "n_slices", "z_min", "z_max", "mean_score"])}
     tabla = result["table"].copy()
     tabla["volumen_cm3"] = tabla["n_voxels"] * float(np.prod(spacing)) / 1000.0
     return {"case_id": case_id, "instance_volume": result["volume"], "spacing_xyz": spacing,
             "region_by_id": {int(f): ns["REGION_OF_CLASS"][int(c)] for f, c in zip(tabla["fragment_id"], tabla["class"])},
             "fragmentos": tabla, "eventos": result["events"], "log_limpieza": result["log"],
             "cortes_con_hueso": int(sum(1 for d in bundle["dets"] if d is not None and len(d["scores"]))),
+            "pelvis": pelvis,
             "segundos": time.time() - t0}
 
 

@@ -1,3 +1,0 @@
-modelo,val_det_map50,val_det_mean_iou,val_seg_dice_pred,val_inst_recall50_pred,val_umbral_cal,val_recall_pelvis_cal,val_fpr_vacios_cal,val_fpr_vacios_fijo,val_vacios_con_caja,cumple,epoca
-sin negativos (actual),0.5602579464877852,0.5637077545288346,0.7449803674159842,0.4375,0.73,1.0,0.0625,0.84375,0.84375,,
-negativos: todos,0.5372987798706819,0.5434216866731882,0.7350451251569825,0.375,0.77,1.0,0.125,0.84375,0.84375,False,1.0

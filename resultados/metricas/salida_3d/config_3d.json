@@ -23,7 +23,7 @@
       "absorb_min_contact": 0.0
     }
   },
-  "creado": "2026-10-12 23:10",
+  "creado": "2026-10-12 18:19",
   "modelo": "modelo_multitarea_final.pt (etapa C_conjunto, época 9, 3 canal(es) de entrada, 2026-10-12 17:55)",
   "casos_de_ajuste": [
     "035",
