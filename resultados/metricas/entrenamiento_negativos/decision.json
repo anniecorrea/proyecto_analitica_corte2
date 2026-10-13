@@ -1,0 +1,30 @@
+{
+  "ganador": "todos",
+  "criterio": {
+    "metrica": "fpr_vacios_cal",
+    "tol_map50": 0.01,
+    "tol_dice": 0.01,
+    "recall_min": 0.99
+  },
+  "smoke_test": false,
+  "por_configuracion": {
+    "todos": {
+      "cumple": true,
+      "epoca": 2,
+      "caida_map50": 0.0007517490357789036,
+      "caida_dice": 0.0011940586250105412,
+      "recall_pelvis": 0.9905138339920949,
+      "fpr": 0.4137055837563452,
+      "mejora_fpr": 0.12182741116751267
+    },
+    "mitad": {
+      "cumple": true,
+      "epoca": 4,
+      "caida_map50": 0.001472134522116697,
+      "caida_dice": -0.0027019834630430672,
+      "recall_pelvis": 0.9905138339920949,
+      "fpr": 0.43147208121827413,
+      "mejora_fpr": 0.10406091370558374
+    }
+  }
+}

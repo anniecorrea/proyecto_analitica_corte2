@@ -1,0 +1,88 @@
+{
+  "SEED": 42,
+  "IMAGE_SIZE": 256,
+  "GRID_SIZE": 16,
+  "IN_CHANNELS": 3,
+  "CENTER_MODE": "interior",
+  "BACKBONE_NAME": "plus",
+  "USE_CBAM": true,
+  "USE_CBAM_GATE": true,
+  "USE_SKIPS": true,
+  "BATCH_SIZE": 16,
+  "VAL_BATCH_SIZE": 16,
+  "WEIGHT_DECAY": 0.0001,
+  "GRAD_CLIP": 10.0,
+  "SEG_WEIGHTS": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "DET_LAMBDAS_SOURCE": "loaded",
+  "JITTER_PX": 8.0,
+  "PRED_BOX_SCORE_MIN": 0.05,
+  "INSTANCE_EVAL_N": 128,
+  "EVAL_SCORE_MIN": 0.01,
+  "USE_AMP": true,
+  "SMOKE_TEST": false,
+  "MAX_TRAIN_SLICES": null,
+  "MAX_VAL_SLICES": null,
+  "DET_LAMBDAS": {
+    "obj": 0.46,
+    "box": 2.9,
+    "cls": 2.03,
+    "noobj": 1.0,
+    "l1": 1.0,
+    "iou": 1.0
+  },
+  "STAGES": [
+    {
+      "epochs": 4,
+      "lr": 0.0001,
+      "train": [
+        "backbone",
+        "cbam",
+        "det_head",
+        "seg_decoder"
+      ],
+      "w_det": 1.0,
+      "w_seg": 1.0,
+      "prior": "mixed",
+      "p_pred_end": 0.5,
+      "select": "negativos",
+      "name": "C_negativos_todos"
+    }
+  ],
+  "DATA_VERSION": {
+    "dataset_csv": "48bf1f9d58fc",
+    "manifest": "e98b40ddbe21",
+    "image_size": 256,
+    "channels": 3
+  },
+  "torch": "2.11.0+cu128",
+  "device": "NVIDIA GeForce RTX 5060",
+  "git_commit": "b17f09008126b56a330dbf146d7cca49da32163d",
+  "AJUSTE_NEGATIVOS": {
+    "modelo_inicial": "modelo_multitarea_final.pt",
+    "fraccion_negativos": 1.0,
+    "n_negativos_train": 5698,
+    "n_positivos_train": 18072,
+    "criterio": {
+      "metrica": "fpr_vacios_cal",
+      "tol_map50": 0.01,
+      "tol_dice": 0.01,
+      "recall_min": 0.99
+    },
+    "umbral_corte_actual": 0.08,
+    "linea_base": {
+      "val_det_map50": 0.8643910064795731,
+      "val_det_mean_iou": 0.8145104193111377,
+      "val_seg_dice_pred": 0.944344942220706,
+      "val_inst_recall50_pred": 0.5786924939467313,
+      "val_umbral_cal": 0.09,
+      "val_recall_pelvis_cal": 0.9905138339920949,
+      "val_fpr_vacios_cal": 0.5355329949238579,
+      "val_fpr_vacios_fijo": 0.5380710659898477,
+      "val_vacios_con_caja": 0.5812182741116751
+    }
+  }
+}
