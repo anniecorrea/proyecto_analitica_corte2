@@ -1,0 +1,3 @@
+,umbral_cal,recall_pelvis_cal,fpr_vacios_cal,umbral_fijo,recall_pelvis_fijo,fpr_vacios_fijo,vacios_con_caja,n_pelvis,n_vacios
+sin_negativos,0.73,0.9966101694915255,0.02564102564102564,0.08,1.0,0.3974358974358974,0.44871794871794873,295.0,78.0
+todos,0.73,0.9932203389830508,0.10256410256410256,0.08,1.0,0.4358974358974359,0.5,295.0,78.0

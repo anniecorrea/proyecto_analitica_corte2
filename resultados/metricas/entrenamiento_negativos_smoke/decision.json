@@ -1,0 +1,21 @@
+{
+  "ganador": "todos",
+  "criterio": {
+    "metrica": "fpr_vacios_cal",
+    "tol_map50": 0.01,
+    "tol_dice": 0.01,
+    "recall_min": 0.99
+  },
+  "smoke_test": true,
+  "por_configuracion": {
+    "todos": {
+      "cumple": false,
+      "epoca": 1,
+      "caida_map50": 0.022959166617103288,
+      "caida_dice": 0.009935242259001664,
+      "recall_pelvis": 1.0,
+      "fpr": 0.125,
+      "mejora_fpr": -0.0625
+    }
+  }
+}
