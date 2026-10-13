@@ -126,6 +126,23 @@ python -m src.generar_evidencias_distancias
 Las capturas son proyecciones 2D para inspección; el valor de distancia se
 calcula en 3D con el espaciado físico del archivo MHA.
 
+## Frontend (Streamlit)
+
+Desde la raiz del repositorio, con el `.venv` activo:
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
+- **Prediccion de fragmentos**: se sube una tomografia `.mha` (o se elige un caso de `data_mha/`) y el modelo
+  `modelo_multitarea_final.pt` marca los fragmentos con la configuracion 3D congelada en
+  `resultados/metricas/salida_3d/config_3d.json`. Muestra cortes axial/coronal, la proyeccion MIP, la tabla de
+  fragmentos y permite descargar la mascara `.mha` y el CSV.
+- **Dashboards**: en construccion.
+
+Las funciones del pipeline no se copian: `app/inferencia.py` las carga por nombre desde los cuadernos, igual que
+`salida_3d.ipynb`. El limite de carga se sube a 1 GB en `.streamlit/config.toml`.
+
 ## Evaluacion integrada
 
 Cuando la etapa `C_conjunto` haya terminado, exporta `modelo_multitarea_final.pt`

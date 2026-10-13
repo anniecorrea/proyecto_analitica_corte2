@@ -3,7 +3,7 @@ pipeline_pengwin.py -- Unión detección -> NMS -> segmentación de instancia ->
 Autor: Fabián.
 
 FLUJO POR CORTE (inferir_cortes)
-  imagen [B,1,256,256]
+  imagen [B,C,256,256]   (C = 1, o 3 con entrada 2.5D: cortes z-1, z, z+1)
     -> backbone (pirámide f1..f4) -> CBAM/compuerta sobre f4                     (Miguel / Annie)
     -> cabeza grid -> decode_predictions (raw) -> nms_por_clase (final)          (Fabián)
     -> priors de región con las cajas FINALES -> decoder de instancias           (Annie)
@@ -29,6 +29,7 @@ POR QUÉ RECIBE FUNCIONES COMO PARÁMETROS
         "restore_fn": restore_letterbox_label_mask,       # 23.9   (solo volumen)
         "link_fn": link_slice_instances_to_volume,        # 23.10  (solo volumen)
         "preprocess_fn": preprocesar_corte,               # HU -> ventaneo -> CLAHE -> letterbox (solo volumen)
+        "in_channels": 1,                                 # opcional: 3 si el modelo usa entrada 2.5D (solo volumen)
     }
 
 REGLAS DOCUMENTADAS
@@ -47,6 +48,7 @@ import pandas as pd
 import torch
 
 from src.deteccion_grid import NMS_CONFIG, decode_predictions, nms_por_clase, postprocess
+from src.entrada_25d import apilar_cortes
 from src.pertenencia import NOMBRES, clase_de_id, clasificar_instancias, instancias_de_mascara
 
 CONFIG_PIPELINE = {
@@ -209,12 +211,17 @@ def inferir_volumen(componentes, volume_hu_zyx, spacing_xyz, cfg=None, batch_siz
     if device is None:
         device = next(componentes["det_head"].parameters()).device
     Z, H, W = vol.shape
+    n_canales = componentes.get("in_channels", 1)     # 3 si el modelo se entrenó con entrada 2.5D
 
     inst_full, cls_full, probs_z, area_z, filas_cortes = [], [], [], [], []
     for inicio in range(0, Z, batch_size):
         zs = range(inicio, min(inicio + batch_size, Z))
         prep = [componentes["preprocess_fn"](vol[z]) for z in zs]
-        x = torch.from_numpy(np.stack([np.asarray(p[0], dtype=np.float32) for p in prep]))[:, None].to(device)
+        if n_canales == 1:
+            x = torch.from_numpy(np.stack([np.asarray(p[0], dtype=np.float32) for p in prep]))[:, None].to(device)
+        else:                                  # entrada 2.5D: cada corte con sus vecinos z-1, z+1 (src/entrada_25d.py)
+            x = torch.from_numpy(apilar_cortes(vol, zs, lambda corte: componentes["preprocess_fn"](corte)[0],
+                                               n_canales)).to(device)
         resultados = inferir_cortes(componentes, x, cfg)
         for z, (_, transform), r in zip(zs, prep, resultados):
             inst = np.asarray(componentes["restore_fn"](r["instance_mask"], (H, W), transform)).astype(np.int64)

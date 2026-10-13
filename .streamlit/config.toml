@@ -1,0 +1,4 @@
+[server]
+# Las tomografías .mha del proyecto pesan ~400 MB (el límite por defecto de Streamlit es 200 MB).
+maxUploadSize = 1024
+maxMessageSize = 1024

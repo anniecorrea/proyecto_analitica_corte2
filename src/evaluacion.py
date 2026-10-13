@@ -36,6 +36,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from src.rutas import (CACHE_DIR, DATASET_CSV, FIGURAS_DIR, MANIFEST_CSV, METRICAS_DIR,  # noqa: E402
                        MODELOS_DIR, NOTEBOOKS_DIR)
+from src.entrada_25d import in_channels_del_modelo  # noqa: E402
 
 BASE_DIR = ROOT
 IMAGE_SIZE = 256
@@ -319,6 +320,7 @@ def _load_model(checkpoint: Path, device: torch.device) -> tuple[nn.Module, dict
         architecture["use_cbam"],
         architecture.get("use_gate", True),
         architecture.get("use_skips", True),
+        in_channels_del_modelo(payload),
     ).to(device)
     model.load_state_dict(payload["model_state_dict"])
     model.eval()
@@ -534,8 +536,8 @@ def _sam_semantic(
     image: np.ndarray,
     detections: dict[str, torch.Tensor],
 ) -> np.ndarray:
-    rgb = np.repeat(
-        np.clip(image[0], 0, 1)[..., None] * 255, 3, axis=2
+    rgb = np.repeat(   # canal central: con entrada 2.5D la imagen trae los cortes z-1, z, z+1
+        np.clip(image[image.shape[0] // 2], 0, 1)[..., None] * 255, 3, axis=2
     ).astype(np.uint8)
     predictor.set_image(rgb)
     semantic = np.zeros(image.shape[-2:], dtype=np.uint8)
@@ -577,7 +579,7 @@ def _save_example(
         panels.append(("SAM", sam_prediction))
     fig, axes = plt.subplots(1, len(panels), figsize=(5 * len(panels), 5))
     for axis, (panel_title, mask) in zip(np.atleast_1d(axes), panels):
-        axis.imshow(image[0], cmap="gray", vmin=0, vmax=1)
+        axis.imshow(image[image.shape[0] // 2], cmap="gray", vmin=0, vmax=1)   # corte central (2.5D: z)
         overlay = np.zeros((*mask.shape, 4), dtype=np.float32)
         for class_id, color in REGION_COLORS.items():
             selected = mask == class_id
@@ -785,6 +787,8 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
     _verify_class_convention()
     nms_fn = _load_callable(args.nms_function)
     model, checkpoint_payload = _load_model(args.checkpoint, DEVICE)
+    # la caché de cortes debe tener los canales que espera el modelo (3 = entrada 2.5D: carpeta <split>_25d)
+    _COMPONENTS["DATA_VERSION"]["channels"] = in_channels_del_modelo(checkpoint_payload)
     sam_predictor = None
     if args.sam_checkpoint is not None:
         if args.split != "test":

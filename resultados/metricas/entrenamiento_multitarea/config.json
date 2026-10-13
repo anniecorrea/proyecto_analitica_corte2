@@ -2,6 +2,8 @@
   "SEED": 42,
   "IMAGE_SIZE": 256,
   "GRID_SIZE": 16,
+  "IN_CHANNELS": 3,
+  "CENTER_MODE": "interior",
   "BACKBONE_NAME": "plus",
   "USE_CBAM": true,
   "USE_CBAM_GATE": true,
@@ -80,9 +82,9 @@
     "dataset_csv": "48bf1f9d58fc",
     "manifest": "e98b40ddbe21",
     "image_size": 256,
-    "channels": 1
+    "channels": 3
   },
   "torch": "2.11.0+cu128",
   "device": "NVIDIA GeForce RTX 5060",
-  "git_commit": "07f6787d125a049ef9d2779394b5c83b2486d0f2"
+  "git_commit": "0a6f61c0c01193acc60de9e4299729a7f8163607"
 }

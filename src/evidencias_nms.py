@@ -220,12 +220,13 @@ def barrido_nms(out, targets, score_thresh=0.05, iou_thrs=(0.3, 0.4, 0.5, 0.6, 0
 # 4. Figura antes / después
 # --------------------------------------------------------------------------------------------------
 def figura_antes_despues(image, target, raw, final, titulo="", path=None):
-    """image [1,H,W] o [H,W]; target con boxes/labels reales; raw y final: dicts de UNA imagen."""
+    """image [C,H,W] o [H,W]; target con boxes/labels reales; raw y final: dicts de UNA imagen.
+    Con entrada 2.5D (C = 3: cortes z-1, z, z+1) se dibuja el canal central."""
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
 
     img = _np(image)
-    img = img[0] if img.ndim == 3 else img
+    img = img[img.shape[0] // 2] if img.ndim == 3 else img
     fig, axes = plt.subplots(1, 2, figsize=(11, 5.6), constrained_layout=True)
     for ax, pred, nombre in ((axes[0], raw, "Antes del NMS"), (axes[1], final, "Después del NMS")):
         ax.imshow(img, cmap="gray")

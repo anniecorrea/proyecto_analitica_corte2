@@ -7,14 +7,15 @@
     "071",
     "079"
   ],
-  "fecha": "2026-10-12 11:03",
+  "fecha": "2026-10-12 18:22",
   "modelo_propio": {
     "archivo": "modelo_multitarea_final.pt",
     "backbone": "plus",
     "cbam": "compuerta",
     "decoder": "con skips",
     "etapa": "C_conjunto",
-    "epoca": 7
+    "epoca": 9,
+    "canales_entrada": 3
   },
   "cajas": {
     "score_min": 0.05,

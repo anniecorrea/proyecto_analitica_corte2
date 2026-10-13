@@ -1,13 +1,13 @@
 {
   "config": {
     "decode": {
-      "center_threshold": 0.4,
-      "min_center_distance": 7,
+      "center_threshold": 0.55,
+      "min_center_distance": 26,
       "min_instance_pixels": 9,
       "fallback_components": true,
-      "det_gate": 0.4,
+      "det_gate": 0.2,
       "gate_min_run": 3,
-      "box_margin": 2
+      "box_margin": 8
     },
     "link": {
       "min_overlap": 0.05,
@@ -19,11 +19,12 @@
       "min_slices": 5,
       "min_voxels": 500,
       "min_score": 0.0,
-      "absorb_max_voxels": 1000
+      "absorb_max_voxels": 100000,
+      "absorb_min_contact": 0.0
     }
   },
-  "creado": "2026-10-12 11:00",
-  "modelo": "modelo_multitarea_final.pt (etapa C_conjunto, época 7)",
+  "creado": "2026-10-12 18:19",
+  "modelo": "modelo_multitarea_final.pt (etapa C_conjunto, época 9, 3 canal(es) de entrada, 2026-10-12 17:55)",
   "casos_de_ajuste": [
     "035",
     "037",
