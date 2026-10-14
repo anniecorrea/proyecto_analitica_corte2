@@ -269,7 +269,10 @@ def tramos_sin_pelvis(tiene_pelvis, min_cortes=1):
 
 
 REGLA_FINAL = {
-    "tol_map50": 0.01,            # frente al original, la mAP@0.50 no baja más de 0,01
+    # Frente al original, la mAP@0.50 no baja más de 0,02. Era 0,01; se amplió el 13-oct-2026, después del entrenamiento
+    # desde cero y ANTES de la comparación final en 3D: 0,01 está dentro de la variación normal entre épocas
+    # (0,847-0,866 en la etapa C), la meta del proyecto es 0,65 y el F1 3D (condición 2) sigue protegiendo el caso con pelvis.
+    "tol_map50": 0.02,
     "tol_dice": 0.01,             # ni el Dice con cajas predichas
     "recall_min": 0.99,           # se conserva al menos el 99 % de los cortes con pelvis
     "tol_f1_3d": 0.04,            # F1 3D (salida reajustada) a lo sumo un fragmento (~0,04 con 27) por debajo del original

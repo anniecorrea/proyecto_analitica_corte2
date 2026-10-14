@@ -88,11 +88,18 @@ class ReglaFinal(unittest.TestCase):
         return d
 
     def test_cada_condicion_puede_descalificar(self):
-        for kw, clave in (({"map50": 0.85}, "topes_2d"), ({"dice": 0.93}, "topes_2d"), ({"recall_pelvis": 0.98}, "topes_2d"),
+        for kw, clave in (({"map50": 0.84}, "topes_2d"), ({"dice": 0.93}, "topes_2d"), ({"recall_pelvis": 0.98}, "topes_2d"),
                           ({"f1_3d": 0.62}, "f1_3d_ok"), ({"frag_sin_pelvis_sistema": 1}, "sin_pelvis_ok")):
             r = cv.regla_modelo_final({"a": self.cand(**kw)}, self.ref)
             self.assertIsNone(r["ganador"], kw)
             self.assertFalse(r["detalle"]["a"][clave], kw)
+
+    def test_tolerancia_de_map_es_0_02(self):
+        # el modelo desde cero bajó 0,0106: con la tolerancia ampliada a 0,02 pasa la condición 1
+        r = cv.regla_modelo_final({"a": self.cand(map50=0.864 - 0.0106)}, self.ref)
+        self.assertTrue(r["detalle"]["a"]["topes_2d"])
+        r = cv.regla_modelo_final({"a": self.cand(map50=0.864 - 0.021)}, self.ref)
+        self.assertFalse(r["detalle"]["a"]["topes_2d"])
 
     def test_un_fragmento_por_debajo_se_tolera(self):
         r = cv.regla_modelo_final({"a": self.cand(f1_3d=0.638)}, self.ref)

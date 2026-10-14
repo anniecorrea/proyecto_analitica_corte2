@@ -171,6 +171,10 @@ dos candidatos con una regla fijada antes de entrenar (`src/cortes_vacios.regla_
 2. `notebooks/Comparacion_final_negativos.ipynb`: compara original, ajustado y desde cero en 3D, reajustando la
    salida 3D para cada uno, y en los tramos sin pelvis de val tratados como estudios separados. Aplica la regla.
 
+Resultado del entrenamiento desde cero (val, volumenes completos): los cortes vacios que pasan bajan de 212 a 51 (13 %),
+con mAP@0.50 0.854 (original 0.864) y Dice 0.941. La tolerancia de mAP de la regla se amplio de 0.01 a 0.02 antes de
+la comparacion final (ver `IA_USAGE.md`).
+
 Control de "pelvis presente" (`src/control_pelvis.py`, usado por el frontend): si los cortes con una caja de score
 >= 0.2 no forman un bloque continuo de al menos 80 mm, el estudio no tiene una pelvis completa y no se entregan
 fragmentos. En val, con pelvis el bloque mide 200 mm o mas; en los tramos sin pelvis, 32 mm como mucho.
