@@ -1,0 +1,65 @@
+{
+  "smoke_test": false,
+  "regla": {
+    "tol_map50": 0.02,
+    "tol_dice": 0.01,
+    "recall_min": 0.99,
+    "tol_f1_3d": 0.04,
+    "frag_sin_pelvis_max": 0
+  },
+  "control_pelvis": {
+    "det_gate": 0.2,
+    "min_mm": 80.0
+  },
+  "referencia": {
+    "map50": 0.8643910064795731,
+    "dice": 0.944344942220706,
+    "recall_pelvis": 0.9905362776025236,
+    "f1_3d": 0.6666666666666667,
+    "frag_sin_pelvis_sistema": 0,
+    "frag_sin_pelvis_modelo": 0
+  },
+  "candidatos": {
+    "ajustado": {
+      "map50": 0.8636392574437942,
+      "dice": 0.9431508835956954,
+      "recall_pelvis": 0.9905362776025236,
+      "f1_3d": 0.6521739130434783,
+      "frag_sin_pelvis_sistema": 0,
+      "frag_sin_pelvis_modelo": 0
+    },
+    "completo": {
+      "map50": 0.8538191185653519,
+      "dice": 0.940806877652955,
+      "recall_pelvis": 0.9905362776025236,
+      "f1_3d": 0.6250000000000001,
+      "frag_sin_pelvis_sistema": 0,
+      "frag_sin_pelvis_modelo": 0
+    }
+  },
+  "ganador": "ajustado",
+  "aceptables": [
+    "ajustado"
+  ],
+  "detalle": {
+    "ajustado": {
+      "topes_2d": true,
+      "f1_3d_ok": true,
+      "sin_pelvis_ok": true,
+      "aceptable": true,
+      "caida_map50": 0.0007517490357789036,
+      "caida_dice": 0.0011940586250105412,
+      "diferencia_f1_3d": -0.01449275362318847
+    },
+    "completo": {
+      "topes_2d": true,
+      "f1_3d_ok": false,
+      "sin_pelvis_ok": true,
+      "aceptable": false,
+      "caida_map50": 0.010571887914221256,
+      "caida_dice": 0.003538064567750965,
+      "diferencia_f1_3d": -0.04166666666666663
+    }
+  },
+  "motivo": "Mayor F1 3D (0.652) por m\u00e1s de un fragmento."
+}
