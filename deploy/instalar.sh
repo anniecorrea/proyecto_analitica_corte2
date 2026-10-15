@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instala (o actualiza) el frontend en un servidor Ubuntu 24.04 de AWS EC2, sin GPU. Ver deploy/AWS.md.
+# Instala (o actualiza) el frontend en un servidor Ubuntu (24.04 o 26.04) de AWS EC2, sin GPU. Ver deploy/AWS.md.
 # Se puede correr las veces que haga falta: la primera vez instala todo y después solo trae los cambios.
 #
 #   curl -fsSL https://raw.githubusercontent.com/anniecorrea/proyecto_analitica_corte2/main/deploy/instalar.sh | bash
@@ -12,6 +12,7 @@ set -euo pipefail
 REPO_URL="${REPO_URL:-https://github.com/anniecorrea/proyecto_analitica_corte2.git}"
 RAMA="${RAMA:-main}"
 SWAP_GB="${SWAP_GB:-4}"
+PYTHON_VERSION="3.12"                     # la versión con la que se probó requirements-app.txt
 DIR="$HOME/proyecto_analitica_corte2"
 
 # Solo los archivos de Git LFS que usa app/inferencia.py. Bajar todos (~600 MB, SAM incluido) gasta la cuota
@@ -20,7 +21,7 @@ LFS_INCLUIR="resultados/modelos/entrenamiento_multitarea/modelo_multitarea_final
 
 echo "== Paquetes del sistema"
 sudo apt-get update -y
-sudo apt-get install -y git git-lfs python3-venv python3-pip
+sudo apt-get install -y git git-lfs curl
 git lfs install --skip-repo
 
 # Las instancias gratuitas tienen poca RAM; la swap evita que el proceso muera al leer una tomografía grande.
@@ -42,8 +43,18 @@ else
 fi
 git -C "$DIR" lfs pull --include="$LFS_INCLUIR"
 
-echo "== Ambiente de Python"
-[ -d "$DIR/.venv" ] || python3 -m venv "$DIR/.venv"
+echo "== Ambiente de Python ${PYTHON_VERSION}"
+# El ambiente usa siempre Python 3.12, no el del sistema: Ubuntu 26.04 trae 3.14 y numpy 2.2.6 no tiene wheel para
+# esa versión (pip intenta compilarlo y falla). uv descarga ese Python aparte, sin tocar el del sistema.
+if ! command -v uv > /dev/null && [ ! -x "$HOME/.local/bin/uv" ]; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+UV="$(command -v uv || echo "$HOME/.local/bin/uv")"
+if [ -x "$DIR/.venv/bin/python" ] && ! "$DIR/.venv/bin/python" -c \
+        "import sys; sys.exit(sys.version_info[:2] != tuple(map(int, '${PYTHON_VERSION}'.split('.'))))"; then
+    rm -rf "$DIR/.venv"                    # ambiente de un intento anterior con otra versión de Python
+fi
+[ -d "$DIR/.venv" ] || "$UV" venv --python "$PYTHON_VERSION" --seed "$DIR/.venv"
 "$DIR/.venv/bin/pip" install --upgrade pip
 "$DIR/.venv/bin/pip" install --no-cache-dir -r "$DIR/requirements-app.txt"
 
