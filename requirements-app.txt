@@ -1,0 +1,13 @@
+# Solo lo que necesita el frontend (app/streamlit_app.py) en un servidor SIN GPU.
+# torch se descarga en su version CPU (~200 MB en vez de ~3 GB con CUDA). Para entrenar, usar requirements.txt.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.11.0
+numpy==2.2.6
+pandas==2.2.3
+SimpleITK==2.5.2
+Pillow==11.3.0
+scipy==1.15.3
+matplotlib==3.10.6
+scikit-image==0.26.0
+streamlit==1.65.0
