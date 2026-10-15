@@ -137,14 +137,30 @@ Desde la raiz del repositorio, con el `.venv` activo:
 streamlit run app/streamlit_app.py
 ```
 
-- **Prediccion de fragmentos**: se sube una tomografia `.mha` (o se elige un caso de `data_mha/`) y el modelo
-  `modelo_multitarea_final.pt` marca los fragmentos con la configuracion 3D congelada en
-  `resultados/metricas/salida_3d/config_3d.json`. Muestra cortes axial/coronal, la proyeccion MIP, la tabla de
-  fragmentos y permite descargar la mascara `.mha` y el CSV.
-- **Dashboards**: en construccion.
+- **Inicio**: la advertencia de uso academico y el boton para subir una tomografia (`.mha`, `.nii` o `.nii.gz`); la
+  prediccion arranca sola con `modelo_multitarea_final.pt` y la configuracion 3D congelada en
+  `resultados/metricas/salida_3d/config_3d.json`. Muestra los tres visualizadores de la consigna:
+  1. MIP coronal del volumen crudo con umbral de 300 HU (sin modelo).
+  2. Inferencia corte por corte con un slider: cajas del detector, mascaras coloreadas por hueso y la distancia de
+     separacion junto a la etiqueta de cada fragmento.
+  3. Reconstruccion 3D: marching cubes (skimage) + Plotly Mesh3d, con la distancia en la etiqueta de cada fragmento.
+
+- **Dashboard de resultados**: metricas de val frente a los objetivos, curvas de entrenamiento, modelo frente a SAM,
+  fragmentos 3D por caso, distancias y latencia en CPU y GPU. Solo lee archivos de `resultados/`.
 
 Las funciones del pipeline no se copian: `app/inferencia.py` las carga por nombre desde los cuadernos, igual que
 `salida_3d.ipynb`. El limite de carga se sube a 1 GB en `.streamlit/config.toml`.
+
+Latencia por imagen y por tomografia en GPU y CPU (la lee el dashboard), con los datos en `data_mha/`:
+
+```bash
+python -m src.medir_latencia            # escribe resultados/metricas/latencia/latencia.json
+```
+
+Despliegue: `deploy/instalar.sh` deja el frontend como servicio en un servidor Ubuntu y lo publica con un tunel de
+Cloudflare (`deploy/pengwin-tunel.service`); la direccion `https://*.trycloudflare.com` sale en
+`sudo journalctl -u pengwin-tunel | grep trycloudflare`. El tunel de Cloudflare no deja subir archivos de mas de
+100 MB; las tomografias mas grandes se suben por la direccion directa del servidor (`http://<IP>:8501`).
 
 ## Cortes sin pelvis (negativos)
 

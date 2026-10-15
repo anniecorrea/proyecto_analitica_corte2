@@ -1,0 +1,33 @@
+{
+  "caso": "035",
+  "modelo": "modelo_multitarea_final.pt",
+  "creado": "2026-10-14 19:46",
+  "resultados": [
+    {
+      "dispositivo": "cuda",
+      "hardware": "NVIDIA GeForce RTX 5060",
+      "hilos_cpu": null,
+      "precision_mixta": true,
+      "ms_por_imagen": 40.852754761905835,
+      "ms_por_imagen_std": 1.4661807531462827,
+      "repeticiones": 3,
+      "imagenes_por_repeticion": 42,
+      "s_por_volumen": 12.66427993774414,
+      "cortes_volumen": 373,
+      "fragmentos_volumen": 5
+    },
+    {
+      "dispositivo": "cpu",
+      "hardware": "AMD Ryzen 5 5600XT 6-Core Processor",
+      "hilos_cpu": 6,
+      "precision_mixta": false,
+      "ms_por_imagen": 120.2000388888813,
+      "ms_por_imagen_std": 4.079975285353043,
+      "repeticiones": 3,
+      "imagenes_por_repeticion": 42,
+      "s_por_volumen": 42.384275913238525,
+      "cortes_volumen": 373,
+      "fragmentos_volumen": 5
+    }
+  ]
+}

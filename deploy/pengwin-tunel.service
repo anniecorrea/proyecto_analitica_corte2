@@ -1,0 +1,16 @@
+# Servicio systemd: túnel de Cloudflare (Quick Tunnel) que publica el frontend en una dirección https://*.trycloudflare.com,
+# accesible desde computador y celular sin abrir puertos. deploy/instalar.sh lo instala.
+# La dirección cambia cada vez que el servicio se reinicia; para verla: sudo journalctl -u pengwin-tunel | grep trycloudflare
+[Unit]
+Description=PENGWIN - tunel de Cloudflare hacia el frontend
+After=network-online.target pengwin.service
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url http://localhost:8501
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

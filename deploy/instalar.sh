@@ -58,14 +58,32 @@ fi
 "$DIR/.venv/bin/pip" install --upgrade pip
 "$DIR/.venv/bin/pip" install --no-cache-dir -r "$DIR/requirements-app.txt"
 
-echo "== Servicio"
-sed "s#/home/ubuntu#$HOME#g; s#^User=.*#User=$USER#" "$DIR/deploy/pengwin.service" \
-    | sudo tee /etc/systemd/system/pengwin.service > /dev/null
+echo "== Túnel de Cloudflare"
+if ! command -v cloudflared > /dev/null; then
+    curl -fsSL -o /tmp/cloudflared.deb \
+        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$(dpkg --print-architecture).deb"
+    sudo dpkg -i /tmp/cloudflared.deb
+    rm -f /tmp/cloudflared.deb
+fi
+
+echo "== Servicios"
+for servicio in pengwin pengwin-tunel; do
+    sed "s#/home/ubuntu#$HOME#g; s#^User=.*#User=$USER#" "$DIR/deploy/$servicio.service" \
+        | sudo tee "/etc/systemd/system/$servicio.service" > /dev/null
+done
 sudo systemctl daemon-reload
-sudo systemctl enable pengwin
-sudo systemctl restart pengwin
+sudo systemctl enable pengwin pengwin-tunel
+sudo systemctl restart pengwin pengwin-tunel
 
 IP=$(curl -fsS -m 3 https://checkip.amazonaws.com 2>/dev/null || echo "<IP-publica>")
+URL=""
+for _ in $(seq 30); do                  # el Quick Tunnel tarda unos segundos en dar su dirección
+    URL=$(sudo journalctl -u pengwin-tunel --since "-2min" --no-pager | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1 || true)
+    [ -n "$URL" ] && break
+    sleep 2
+done
 echo
-echo "Listo. Abre http://$IP:8501 (la primera carga del modelo tarda unos segundos)."
+echo "Listo (la primera carga del modelo tarda unos segundos)."
+echo "  Túnel de Cloudflare (computador y celular): ${URL:-sudo journalctl -u pengwin-tunel | grep trycloudflare}"
+echo "  Directo por IP:                             http://$IP:8501"
 echo "Logs: sudo journalctl -u pengwin -f"

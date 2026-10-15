@@ -23,7 +23,8 @@ import torch
 
 from definiciones_notebooks import cargar_definiciones
 import control_pelvis
-from rutas import METRICAS_DIR, MODELOS_DIR, NOTEBOOKS_DIR
+from distancias_fragmentos import measure_fragment_separations
+from rutas import DATA_MHA_DIR, METRICAS_DIR, MODELOS_DIR, NOTEBOOKS_DIR
 
 warnings.filterwarnings("ignore", message="'mode' parameter is deprecated")   # letterbox_pair usa mode= (Pillow 13)
 
@@ -69,12 +70,14 @@ def cargar_pipeline():
     return {"ns": ns, "comp": comp, "cfg_3d": cfg_3d, "info": info}
 
 
-def leer_mha(origen):
-    """origen: ruta a un .mha o bytes de un archivo subido. Devuelve (volumen HU (z, y, x) float32, imagen SimpleITK)."""
+def leer_mha(origen, nombre=".mha"):
+    """origen: ruta a un .mha/.nii/.nii.gz o bytes de un archivo subido (nombre da la extensión).
+    Devuelve (volumen HU (z, y, x) float32, imagen SimpleITK)."""
     if isinstance(origen, (str, Path)):
         image_itk = sitk.ReadImage(str(origen))
     else:                                   # SimpleITK solo lee desde disco: los bytes subidos pasan por un temporal
-        fd, tmp = tempfile.mkstemp(suffix=".mha")
+        sufijo = ".nii.gz" if str(nombre).lower().endswith(".nii.gz") else Path(str(nombre)).suffix or ".mha"
+        fd, tmp = tempfile.mkstemp(suffix=sufijo)
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(origen)
@@ -103,12 +106,55 @@ def predecir_volumen(pipeline, volume_hu, image_itk, case_id="subido"):
                   "table": pd.DataFrame(columns=["fragment_id", "class", "region", "n_voxels", "n_slices", "z_min", "z_max", "mean_score"])}
     tabla = result["table"].copy()
     tabla["volumen_cm3"] = tabla["n_voxels"] * float(np.prod(spacing)) / 1000.0
+    region_by_id = {int(f): ns["REGION_OF_CLASS"][int(c)] for f, c in zip(tabla["fragment_id"], tabla["class"])}
+    tabla = _con_distancias(tabla, result["volume"], spacing, case_id, region_by_id)
+    cajas = cajas_por_corte(bundle, cfg["decode"]["det_gate"]) if pelvis["presente"] else [None] * len(bundle["dets"])
     return {"case_id": case_id, "instance_volume": result["volume"], "spacing_xyz": spacing,
-            "region_by_id": {int(f): ns["REGION_OF_CLASS"][int(c)] for f, c in zip(tabla["fragment_id"], tabla["class"])},
-            "fragmentos": tabla, "eventos": result["events"], "log_limpieza": result["log"],
+            "region_by_id": region_by_id, "fragmentos": tabla, "cajas": cajas,
+            "eventos": result["events"], "log_limpieza": result["log"],
             "cortes_con_hueso": int(sum(1 for d in bundle["dets"] if d is not None and len(d["scores"]))),
-            "pelvis": pelvis,
+            "pelvis": pelvis, "n_cortes": int(volume_hu.shape[0]),
             "segundos": time.time() - t0}
+
+
+def _con_distancias(tabla, instance_volume, spacing, case_id, region_by_id):
+    """Distancia borde a borde (mm) de cada fragmento al principal de su hueso (src/distancias_fragmentos.py:
+    EDT con el espaciado físico del header). El principal es el de más vóxeles y tiene distancia 0."""
+    tabla = tabla.copy()
+    tabla["distancia_mm"], tabla["es_principal"] = np.nan, False
+    if len(tabla) == 0:
+        return tabla
+    dist = measure_fragment_separations(instance_volume, spacing, case_id=case_id, region_by_id=region_by_id)
+    dist = dist.set_index("fragment_id")
+    tabla["distancia_mm"] = tabla["fragment_id"].map(dist["distance_mm"])
+    tabla["es_principal"] = tabla["fragment_id"].map(dist["is_main"]).fillna(False).astype(bool)
+    return tabla
+
+
+def cajas_por_corte(bundle, det_gate):
+    """Cajas del detector (grid + NMS) en píxeles del corte ORIGINAL: deshace el letterbox a 256 x 256.
+    Solo las de score >= det_gate, el mismo umbral con el que la salida 3D decide qué cortes usar."""
+    tr = bundle["transform"]
+    salida = []
+    for det in bundle["dets"]:
+        if det is None or not len(det["scores"]):
+            salida.append(None)
+            continue
+        keep = det["scores"] >= det_gate
+        boxes = det["boxes"][keep].astype(np.float32).copy()
+        boxes[:, [0, 2]] = (boxes[:, [0, 2]] - tr["offset_x"]) / tr["scale"]
+        boxes[:, [1, 3]] = (boxes[:, [1, 3]] - tr["offset_y"]) / tr["scale"]
+        salida.append({"boxes": boxes, "labels": det["labels"][keep].astype(int), "scores": det["scores"][keep]}
+                      if keep.any() else None)
+    return salida
+
+
+UMBRAL_HUESO_HU = 300                       # mismo umbral que compute_mip de Visualizacion_3d.ipynb
+
+
+def mip_hueso(volume_hu, umbral_hu=UMBRAL_HUESO_HU):
+    """Visualizador 1: MIP coronal del volumen CRUDO dejando solo el hueso (HU > umbral). No usa el modelo."""
+    return np.where(volume_hu > umbral_hu, volume_hu, umbral_hu).max(axis=1)
 
 
 def cabecera(image_itk):
@@ -132,17 +178,21 @@ def mha_de_prediccion(instance_volume, header):
 
 
 def casos_locales():
-    """MHA de imágenes en data_mha/ (para probar sin subir 400 MB por el navegador)."""
-    carpeta = ROOT / "data_mha"
-    if not carpeta.is_dir():
+    """Tomografías de ejemplo en data_mha/ (carpetas *images*). En el servidor sirven para la demo: el túnel de
+    Cloudflare no deja subir archivos de más de 100 MB y una tomografía pesa ~400 MB."""
+    if not DATA_MHA_DIR.is_dir():
         return []
-    return sorted(p for p in carpeta.glob("*images*/*.mha"))
+    return sorted(p for p in DATA_MHA_DIR.glob("*images*/*.mha"))
 
 
-COLUMNAS_TABLA = ["fragment_id", "region", "volumen_cm3", "n_voxels", "n_slices", "z_min", "z_max", "mean_score"]
+NOMBRE_REGION = {"sacro": "Sacro", "coxal_izquierdo": "Coxal izquierdo", "coxal_derecho": "Coxal derecho"}
+COLUMNAS_TABLA = ["fragment_id", "region", "es_principal", "distancia_mm", "volumen_cm3", "n_slices", "mean_score"]
 
 
 def tabla_para_mostrar(fragmentos):
-    return pd.DataFrame(fragmentos)[COLUMNAS_TABLA].rename(columns={
-        "fragment_id": "Fragmento", "region": "Región", "volumen_cm3": "Volumen (cm³)", "n_voxels": "Vóxeles",
-        "n_slices": "Cortes", "z_min": "z inicial", "z_max": "z final", "mean_score": "Confianza media"})
+    tabla = pd.DataFrame(fragmentos)[COLUMNAS_TABLA].copy()
+    tabla["region"] = tabla["region"].map(NOMBRE_REGION).fillna(tabla["region"])
+    tabla["es_principal"] = np.where(tabla["es_principal"], "Principal", "Conminuto")
+    return tabla.sort_values(["region", "fragment_id"]).rename(columns={
+        "fragment_id": "Fragmento", "region": "Hueso", "es_principal": "Tipo", "distancia_mm": "Distancia (mm)",
+        "volumen_cm3": "Volumen (cm³)", "n_slices": "Cortes", "mean_score": "Confianza media"})
