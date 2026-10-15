@@ -1,0 +1,17 @@
+{
+  "plano": "sagital",
+  "estado": "ok",
+  "epoca_elegida": 8,
+  "mAP50": 0.8636055821170944,
+  "Dice_pred": 0.9543505799537493,
+  "Dice_gt": 0.9576673176878243,
+  "frag_recall50_pred": 0.96,
+  "vacios_que_pasan_cal": 0.033156498673740056,
+  "umbral_cal": 0.42,
+  "recall_pelvis_cal": 0.99,
+  "vacios_con_caja": 0.07824933687002653,
+  "modelo": "D:\\proyecto_analitica_corte2\\resultados\\modelos\\entrenamiento_multitarea_sagital\\modelo_multitarea_sagital.pt",
+  "mAP50_linea_real": 0.864744471260758,
+  "Dice_pred_linea_real": 0.9544753366741663,
+  "minutos": 202.7
+}
