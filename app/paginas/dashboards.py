@@ -1,4 +1,5 @@
-"""Dashboard integrado: métricas del modelo en validación, comparación con SAM, salida 3D, distancias y latencia.
+"""Dashboard integrado: métricas del modelo en validación, entrenamiento de los modelos por plano, comparación con SAM,
+salida 3D y latencia.
 Todo se lee de resultados/ (lo generan los cuadernos y src/medir_latencia.py); aquí no se recalcula nada."""
 import json
 
@@ -6,9 +7,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from rutas import DATOS_DIR, FIGURAS_DIR, METRICAS_DIR
+from rutas import METRICAS_DIR
 
-COLOR_REGION = {"sacro": "#D9A62E", "coxal_izquierdo": "#2B8CBE", "coxal_derecho": "#E34A33"}
 NOMBRE_REGION = {"sacro": "Sacro", "coxal_izquierdo": "Coxal izquierdo", "coxal_derecho": "Coxal derecho"}
 COLOR_MODELO, COLOR_SAM = "#2B8CBE", "#9E9E9E"
 
@@ -28,23 +28,37 @@ def layout(fig, alto=340, **kw):
 
 
 st.title("Dashboard de resultados")
-evaluacion = leer_json(METRICAS_DIR / "evaluacion" / "metricas_val.json")
+PLANOS = {"axial": "Axial", "coronal": "Coronal", "sagital": "Sagital"}
+# src/evaluacion.py --plano todos: una carpeta por modelo; sin ellas, la evaluación del modelo anterior
+evaluaciones = {p: leer_json(METRICAS_DIR / "evaluacion" / p / "metricas_val.json") for p in PLANOS}
+evaluaciones = {p: e for p, e in evaluaciones.items() if e is not None}
+anterior = leer_json(METRICAS_DIR / "evaluacion" / "metricas_val.json")
 
-resumen, entrenamiento, sam, salida3d, latencia, casos = st.tabs(
-    ["Resumen", "Entrenamiento", "Modelo vs SAM", "Fragmentos 3D y distancias", "Latencia", "Casos difíciles"])
+resumen, entrenamiento, sam, salida3d, latencia = st.tabs(
+    ["Resumen", "Entrenamiento", "Modelo vs SAM", "Fragmentos 3D", "Latencia"])
+
+METRICAS_CONSIGNA = [("Clasificación F1", "classification_f1_macro"), ("Clasificación AUC", "classification_auc_macro"),
+                     ("Detección IoU", "bbox_mean_iou"), ("Detección mAP@0.50", "bbox_map50"),
+                     ("Detección mAP@[.50:.95]", "bbox_map50_95"), ("Segmentación Dice", "modelo_fragment_dice"),
+                     ("Segmentación IoU", "modelo_fragment_iou")]
 
 # ---------------------------------------------------------------------------------------------------------------
 with resumen:
+    if evaluaciones:
+        plano_eval = st.radio("Modelo", list(evaluaciones), format_func=PLANOS.get, horizontal=True,
+                              key="plano_resumen")
+        evaluacion = evaluaciones[plano_eval]
+        st.caption(f"Validación con los cortes del plano {PLANOS[plano_eval].lower()} ({evaluacion['n_slices']} cortes "
+                   f"de {evaluacion['n_cases']} casos), preparados igual que en el entrenamiento del modelo.")
+    else:
+        evaluacion = anterior
     if evaluacion is None:
-        st.info("Falta resultados/metricas/evaluacion/metricas_val.json (src/evaluacion.py).")
+        st.info("Falta la evaluación: `python -m src.evaluacion --plano todos --split val "
+                "--nms-function src.deteccion_grid:nms_por_clase`.")
     else:
         st.subheader("Objetivos de la consigna")
         st.caption("Flecha verde: el valor supera el objetivo; roja: queda por debajo.")
-        metricas = [("Clasificación F1", "classification_f1_macro"), ("Clasificación AUC", "classification_auc_macro"),
-                    ("Detección IoU", "bbox_mean_iou"), ("Detección mAP@0.50", "bbox_map50"),
-                    ("Detección mAP@[.50:.95]", "bbox_map50_95"), ("Segmentación Dice", "modelo_fragment_dice"),
-                    ("Segmentación IoU", "modelo_fragment_iou")]
-        for fila in (metricas[:4], metricas[4:]):
+        for fila in (METRICAS_CONSIGNA[:4], METRICAS_CONSIGNA[4:]):
             cols = st.columns(4)
             for col, (nombre, clave) in zip(cols, fila):
                 valor, objetivo = evaluacion[clave], evaluacion["targets"][clave]["minimum"]
@@ -53,6 +67,14 @@ with resumen:
         st.caption("Dice e IoU de segmentación son por fragmento 2D (cada fragmento real contra su mejor "
                    f"predicción en el corte). Por región anatómica, el Dice es {evaluacion['modelo_dice_macro']:.3f} "
                    f"y el IoU {evaluacion['modelo_iou_macro']:.3f}.")
+        if len(evaluaciones) > 1:
+            st.subheader("Comparación de los tres modelos")
+            tabla = pd.DataFrame({PLANOS[p]: {nombre: e[clave] for nombre, clave in METRICAS_CONSIGNA}
+                                  for p, e in evaluaciones.items()})
+            tabla.insert(0, "Objetivo", [evaluaciones[next(iter(evaluaciones))]["targets"][clave]["minimum"]
+                                         for _, clave in METRICAS_CONSIGNA])
+            st.dataframe(tabla, width="stretch",
+                         column_config={c: st.column_config.NumberColumn(format="%.3f") for c in tabla.columns})
 
         sal =leer_csv(METRICAS_DIR / "salida_3d" / "resultado_val_config_ajustada.csv")
         if sal is not None:
@@ -66,10 +88,28 @@ with resumen:
 
 # ---------------------------------------------------------------------------------------------------------------
 with entrenamiento:
-    hist = leer_csv(METRICAS_DIR / "entrenamiento_multitarea" / "historial_completo.csv")
+    planos = PLANOS
+    resumen_planos = leer_csv(METRICAS_DIR / "entrenamiento_multitarea_planos" / "resumen_planos.csv")
+    if resumen_planos is not None:
+        st.subheader("Modelos por plano (validación)")
+        st.caption("El frontend usa un modelo por plano anatómico. Los tres comparten arquitectura (backbone + CBAM + "
+                   "detección + decoder) y entrada 2.5D; el sagital añade un canal con la posición lateral del corte.")
+        tabla = resumen_planos.set_index("plano").reindex(list(planos)).reset_index()
+        tabla = pd.DataFrame({"Plano": tabla["plano"].map(planos), "mAP@0.50": tabla["mAP50"],
+                              "Dice (cajas predichas)": tabla["Dice_pred"],
+                              "Recall de fragmentos": tabla["frag_recall50_pred"],
+                              "Cortes vacíos que pasan": tabla["vacios_que_pasan_cal"],
+                              "Época elegida": tabla["epoca_elegida"]})
+        st.dataframe(tabla, hide_index=True, width="stretch",
+                     column_config={c: st.column_config.NumberColumn(format="%.3f")
+                                    for c in ("mAP@0.50", "Dice (cajas predichas)", "Recall de fragmentos",
+                                              "Cortes vacíos que pasan")})
+    plano = st.radio("Plano", list(planos), format_func=planos.get, horizontal=True, key="plano_entrenamiento")
+    hist = leer_csv(METRICAS_DIR / f"entrenamiento_multitarea_{plano}" / "historial_completo.csv")
     if hist is None:
-        st.info("Falta el historial de entrenamiento.")
+        st.info(f"Falta el historial de entrenamiento del modelo {planos[plano].lower()}.")
     else:
+        st.subheader(f"Curvas de entrenamiento: modelo {planos[plano].lower()}")
         hist = hist.reset_index(drop=True)
         hist["epoca_global"] = hist.index + 1
         etapas = {"A_deteccion": "A: detección", "B_decoder": "B: decoder", "C_conjunto": "C: conjunto"}
@@ -147,50 +187,13 @@ with salida3d:
                       column_config={c: st.column_config.NumberColumn(format="%.2f")
                                      for c in ("Precisión", "Recall", "F1", "Dice por hueso")})
 
-    st.subheader("Distancia de separación: predicción frente a referencia")
-    dist = leer_csv(METRICAS_DIR / "salida_3d" / "distancias_pred_vs_gt_val.csv", dtype={"caso": str})
-    conminutos = None if dist is None else dist[~dist["gt_is_main"]]
-    if dist is not None:
-        c = st.columns(3)
-        c[0].metric("Fragmentos emparejados", len(dist), help="Fragmentos reales con un predicho de IoU 3D ≥ 0.5",
-                    border=True)
-        c[1].metric("Fragmento principal correcto", f"{dist['main_ok'].mean():.0%}", border=True)
-        c[2].metric("Error medio en conminutos", f"{conminutos['abs_error_mm'].mean():.1f} mm" if len(conminutos)
-                    else "sin datos", border=True)
-        if not len(conminutos):
-            st.warning("En validación solo se emparejan los fragmentos principales, cuya distancia es 0 mm por "
-                       "definición. Los fragmentos conminutos pequeños no se recuperan o se fusionan con el principal "
-                       "(contacto en la superficie de fractura), así que su distancia todavía no se puede comparar "
-                       "con la referencia. Abajo, la distribución real de esas distancias.")
-    izq, der = st.columns(2)
-    if conminutos is not None and len(conminutos):
-        fig = go.Figure(go.Scatter(x=conminutos["gt_distance_mm"], y=conminutos["pred_distance_mm"], mode="markers",
-                                   marker={"color": conminutos["region"].map(COLOR_REGION), "size": 9},
-                                   text=conminutos["caso"], hovertemplate="Caso %{text}<br>real %{x:.1f} mm<br>"
-                                                                          "predicha %{y:.1f} mm<extra></extra>"))
-        tope = max(1.0, float(conminutos[["gt_distance_mm", "pred_distance_mm"]].max().max()))
-        fig.add_shape(type="line", x0=0, y0=0, x1=tope, y1=tope, line={"dash": "dot", "color": "#888"})
-        izq.markdown("**Distancia predicha frente a la real (conminutos)**")
-        izq.plotly_chart(layout(fig, xaxis_title="Distancia real (mm)", yaxis_title="Distancia predicha (mm)"),
-                         width="stretch")
-    ref = leer_csv(DATOS_DIR / "distancias_referencia.csv", dtype={"case_id": str})
-    if ref is not None:
-        conm = ref[~ref["is_main"]]
-        fig = go.Figure([go.Histogram(x=conm.loc[conm["region"] == r, "distance_mm"], name=NOMBRE_REGION[r],
-                                      marker_color=COLOR_REGION[r], nbinsx=30) for r in NOMBRE_REGION])
-        destino = der if conminutos is not None and len(conminutos) else izq
-        destino.markdown(f"**Distancia real de los fragmentos conminutos** ({len(conm)} fragmentos, "
-                         f"{ref['case_id'].nunique()} casos)")
-        destino.plotly_chart(layout(fig, barmode="stack", xaxis_title="Distancia al fragmento principal (mm)",
-                                    yaxis_title="Fragmentos"), width="stretch")
-
 # ---------------------------------------------------------------------------------------------------------------
 with latencia:
     lat = leer_json(METRICAS_DIR / "latencia" / "latencia.json")
     if lat is None:
         st.info("Aún no hay medición. Ejecuta `python -m src.medir_latencia` en una máquina con los datos.")
     else:
-        st.caption(f"Caso {lat['caso']} completo con el pipeline del frontend ({lat['creado']}). La latencia por "
+        st.caption(f"Caso {lat['caso']}." "La latencia por "
                    "imagen es un corte a la vez: preprocesamiento, backbone con CBAM, detección con NMS y decoder.")
         cols = st.columns(len(lat["resultados"]))
         for col, r in zip(cols, lat["resultados"]):
@@ -198,28 +201,9 @@ with latencia:
                 st.markdown(f"**{r['dispositivo'].upper()}** · {r['hardware']}")
                 a, b = st.columns(2)
                 a.metric("Por imagen", f"{r['ms_por_imagen']:.0f} ms")
-                b.metric("Por tomografía", f"{r['s_por_volumen']:.0f} s", help=f"{r['cortes_volumen']} cortes")
-                extra = "precisión mixta (AMP)" if r["precision_mixta"] else f"{r['hilos_cpu']} hilos, float32"
-                st.caption(f"{extra}; media de {r['repeticiones']} repeticiones de {r['imagenes_por_repeticion']} "
-                           "imágenes.")
+                b.metric("Por tomografía", f"{r['s_por_volumen']:.0f} s", help=f"{r['cortes_volumen']} cortes: los tres modelos (axial, coronal y sagital)")
         if len(lat["resultados"]) > 1:
             gpu = next(r for r in lat["resultados"] if r["dispositivo"] == "cuda")
             cpu = next(r for r in lat["resultados"] if r["dispositivo"] == "cpu")
             st.write(f"En GPU cada imagen es **{cpu['ms_por_imagen'] / gpu['ms_por_imagen']:.0f} veces** más rápida "
                      "que en CPU.")
-
-# ---------------------------------------------------------------------------------------------------------------
-with casos:
-    st.caption("Cortes de validación con menor Dice: a la izquierda la anotación real y a la derecha la predicción. "
-               "Suelen ser cortes de los extremos de la pelvis con fragmentos de muy pocos píxeles.")
-    peores = sorted((FIGURAS_DIR / "evaluacion").glob("val_peor*.png"))
-    aciertos = sorted((FIGURAS_DIR / "evaluacion").glob("val_acierto*.png"))
-    if peores:
-        st.subheader("Cinco peores cortes")
-        for img in peores:
-            _, caso, _, corte = img.stem.split("_", 1)[1].split("_")
-            st.image(str(img), caption=f"Caso {caso}, corte {int(corte)}", width="stretch")
-    if aciertos:
-        with st.expander("Mejores cortes"):
-            for img in aciertos:
-                st.image(str(img), width="stretch")

@@ -1,0 +1,10 @@
+Metrica,Objetivo,Modelo,SAM,Cumple
+Clasificacion F1 macro,>= 0.85,0.968,-,si
+Clasificacion AUC macro,>= 0.85,0.992,-,si
+Deteccion IoU promedio,>= 0.65,0.830,-,si
+Deteccion mAP@0.50,>= 0.65,0.924,-,si
+Deteccion mAP@[0.50:0.95],>= 0.40,0.665,-,si
+Segmentacion Dice por fragmento,>= 0.85,0.787,-,no
+Segmentacion IoU por fragmento,>= 0.70,0.707,-,si
+Dice semantico macro (modelo vs SAM),,0.955,n/a,
+IoU semantico macro (modelo vs SAM),,0.913,n/a,

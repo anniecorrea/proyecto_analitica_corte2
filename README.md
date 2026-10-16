@@ -137,16 +137,22 @@ Desde la raiz del repositorio, con el `.venv` activo:
 streamlit run app/streamlit_app.py
 ```
 
-- **Inicio**: la advertencia de uso academico y el boton para subir una tomografia (`.mha`, `.nii` o `.nii.gz`); la
-  prediccion arranca sola con `modelo_multitarea_final.pt` y la configuracion 3D congelada en
-  `resultados/metricas/salida_3d/config_3d.json`. Muestra los tres visualizadores de la consigna:
-  1. MIP coronal del volumen crudo con umbral de 300 HU (sin modelo).
-  2. Inferencia corte por corte con un slider: cajas del detector, mascaras coloreadas por hueso y la distancia de
-     separacion junto a la etiqueta de cada fragmento.
-  3. Reconstruccion 3D: marching cubes (skimage) + Plotly Mesh3d, con la distancia en la etiqueta de cada fragmento.
+- **Inicio**: titulo, introduccion del proyecto, la advertencia de uso academico y el boton para subir una tomografia
+  (`.mha`, `.nii` o `.nii.gz`). La prediccion arranca sola con los tres modelos por plano
+  (`modelo_multitarea_axial.pt`, `modelo_multitarea_coronal.pt` y `modelo_multitarea_sagital.pt`) y la configuracion
+  3D congelada en `resultados/metricas/salida_3d/config_3d.json`. La imagen y los resultados se conservan al ir al
+  dashboard y volver; se borran al quitar el archivo del cargador.
+  - **Fragmentos** (al inicio): cuantos fragmentos tiene la imagen (etiqueta de referencia) y cuantos predice el
+    modelo del plano elegido. La etiqueta se toma de `data_mha/PENGWIN_CT_train_labels/` si el archivo se llama como
+    un caso del dataset.
+  - Visualizadores de la consigna, en el plano elegido (axial, coronal o sagital; cada plano usa su modelo):
+    1. MIP coronal del volumen crudo con umbral de 300 HU (sin modelo).
+    2. Inferencia corte por corte con un slider: cajas del detector, mascaras coloreadas por hueso y la distancia de
+       separacion junto a la etiqueta de cada fragmento (o la referencia, si hay etiqueta).
+    3. Reconstruccion 3D: marching cubes (skimage) + Plotly Mesh3d, con la distancia en la etiqueta de cada fragmento.
 
-- **Dashboard de resultados**: metricas de val frente a los objetivos, curvas de entrenamiento, modelo frente a SAM,
-  fragmentos 3D por caso, distancias y latencia en CPU y GPU. Solo lee archivos de `resultados/`.
+- **Dashboard de resultados**: metricas de val frente a los objetivos, entrenamiento de los tres modelos por plano,
+  modelo frente a SAM, fragmentos 3D por caso y latencia en CPU y GPU. Solo lee archivos de `resultados/`.
 
 Las funciones del pipeline no se copian: `app/inferencia.py` las carga por nombre desde los cuadernos, igual que
 `salida_3d.ipynb`. El limite de carga se sube a 1 GB en `.streamlit/config.toml`.
@@ -199,19 +205,25 @@ Pruebas sin GPU: `python -m unittest tests.test_cortes_vacios tests.test_control
 
 ## Evaluacion integrada
 
-Cuando la etapa `C_conjunto` haya terminado, exporta `modelo_multitarea_final.pt`
-desde `notebooks/Entrenamiento_multitarea.ipynb` y ejecuta desde la raiz:
+Evalua los tres modelos por plano que exporta `notebooks/Entrenamiento_multitarea_planos.ipynb`
+(`modelo_multitarea_{axial,coronal,sagital}.pt`). Desde la raiz:
 
 ```bash
-python -m src.evaluacion --nms-function src.deteccion_grid:nms_por_clase --sam-checkpoint ruta\sam_vit_b.pth --device auto
+python -m src.evaluacion --plano todos --split val --nms-function src.deteccion_grid:nms_por_clase --device auto
 ```
 
-La comparacion con SAM corre solo sobre `test`, usando las cajas predichas como
-prompts. El checkpoint SAM es opcional; sin el, se evalua el modelo propio y el
-reporte deja constancia de que SAM no se ejecuto. Las metricas y los resultados
-por corte quedan en `resultados/metricas/evaluacion/`, y los ejemplos de
-acierto/error en `resultados/figuras/evaluacion/`.
-Usa `--device cpu` o `--device cuda` para medir cada escenario por separado.
+Cada modelo se evalua con los mismos datos y el mismo codigo de su entrenamiento: las clases de dataset, la cache de
+cortes y `MultiTaskNet` se cargan del cuaderno de planos, y en `val` se reutiliza la cache que construyo el
+entrenamiento (orientacion canonica, pixeles cuadrados, entrada 2.5D y, en el sagital, el canal de posicion con la
+linea media del centro del campo de vision). El script comprueba que `dataset.csv`, `planos.py`, `orientacion.py` y
+los manifiestos sean los mismos que uso el entrenamiento (`datos_iguales_al_entrenamiento` en las metricas); si
+cambiaron, reconstruye la cache con la misma funcion. Las metricas de cada plano quedan en
+`resultados/metricas/evaluacion/{plano}/`, el resumen en `resumen_planos_{split}.csv` y los ejemplos de
+acierto/error en `resultados/figuras/evaluacion/{plano}/`. `--plano axial|coronal|sagital` evalua uno solo y
+`--plano anterior` el modelo axial anterior (`modelo_multitarea_final.pt`).
+
+La comparacion con SAM (`--sam-checkpoint ruta\sam_vit_b.pth`) corre solo sobre `test`, usando las cajas predichas
+como prompts. Usa `--device cpu` o `--device cuda` para medir cada escenario por separado.
 El manifiesto actual contiene cortes positivos, por lo que los resultados se
 interpretan sobre esos cortes y no sobre cortes vacios del volumen.
 F1/AUC miden presencia de cada region por corte; Dice/IoU del modelo se calculan

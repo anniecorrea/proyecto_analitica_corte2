@@ -1,8 +1,12 @@
 """Imágenes y figuras del frontend: los tres visualizadores de la consigna (sección 3.4).
 
 1. MIP del volumen crudo con umbral HU (sin modelo).
-2. Corte a corte: cajas del detector + máscaras coloreadas + distancia de cada fragmento junto a su etiqueta.
+2. Corte a corte (axial, coronal o sagital): cajas del detector + máscaras coloreadas + distancia de cada fragmento
+   junto a su etiqueta.
 3. Reconstrucción 3D: marching cubes (skimage) de cada fragmento + malla Plotly Mesh3d con la distancia en la etiqueta.
+
+Todos los volúmenes están en orientación canónica LPS (z, y, x): x crece hacia la izquierda del paciente, y hacia
+posterior y z hacia superior (src/orientacion.py).
 """
 import numpy as np
 import plotly.graph_objects as go
@@ -10,6 +14,8 @@ from matplotlib.colors import to_hex, to_rgb
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage
 from skimage import measure
+
+import planos
 
 VENTANA_HU = (-200.0, 1200.0)          # ventana de hueso para mostrar (solo visualización)
 SOMBRAS = (0.0, 0.35, 0.6, 0.2, 0.5)   # misma regla que _instance_colors de salida_3d.ipynb
@@ -65,9 +71,71 @@ def imagen_mip_hueso(mip_hu, spacing_xyz, umbral_hu):
     return _con_proporcion(np.repeat(gris[..., None], 3, axis=2), spacing_xyz[2] / spacing_xyz[0])
 
 
+def vista_fragmentos(mip_hu, etiquetas, lut, spacing_xyz, umbral_hu, textos, escala=2):
+    """Vista frontal de todos los fragmentos sobre el MIP coronal: en cada (z, x) se pinta el fragmento más anterior
+    (el primero a lo largo de y, que crece hacia posterior). Cada fragmento lleva su etiqueta en la proyección de su
+    centro 3D, así se nombra aunque quede detrás de otro. textos: {fragment_id: texto}."""
+    hay = etiquetas > 0
+    primero = hay.argmax(axis=1)                                              # (z, x)
+    frente = np.take_along_axis(etiquetas, primero[:, None, :], axis=1)[:, 0, :]
+    del hay
+    gris = (np.clip((mip_hu - umbral_hu) / (1500.0 - umbral_hu), 0, 1) * 255).astype(np.uint8)
+    rgb = superponer(gris, frente, lut, alpha=0.65)
+    alto = rgb.shape[0]
+    img = Image.fromarray(_con_proporcion(rgb, spacing_xyz[2] / spacing_xyz[0]))
+    escala_v = img.height / alto
+    img = img.resize((img.width * escala, img.height * escala), Image.BILINEAR)
+    ids = [int(i) for i in textos]
+    if ids:
+        draw = ImageDraw.Draw(img)
+        fuente = _fuente(13 * escala // 2 + 4)
+        centros = ndimage.center_of_mass(np.ones(etiquetas.shape, dtype=np.uint8), etiquetas, ids)
+        ocupadas = []
+        for fid, (cz, _, cx) in zip(ids, centros):
+            if not np.isfinite(cz):
+                continue
+            x, y = cx * escala, (alto - 1 - cz) * escala_v * escala            # la cabeza queda arriba
+            x0, y0, x1, y1 = draw.textbbox((x, y), textos[fid], font=fuente, anchor="mm")
+            for _ in range(10):                  # si choca con una etiqueta ya puesta, se baja una línea
+                if not any(x0 < b[2] and b[0] < x1 and y0 - 2 < b[3] and b[1] < y1 + 2 for b in ocupadas):
+                    break
+                y += y1 - y0 + 6
+                x0, y0, x1, y1 = draw.textbbox((x, y), textos[fid], font=fuente, anchor="mm")
+            ocupadas.append((x0, y0, x1, y1))
+            draw.rectangle([x0 - 3, y0 - 2, x1 + 3, y1 + 2], fill=(0, 0, 0))
+            draw.text((x, y), textos[fid], fill=to_hex(lut[fid]), font=fuente, anchor="mm")
+    return img
+
+
 # ---------------------------------------------------------------------------------------------------------------
 # Visualizador 2: inferencia corte por corte
 # ---------------------------------------------------------------------------------------------------------------
+def corte_del_plano(gris_u8, etiquetas, plano, idx, spacing_xyz):
+    """Corte `idx` del plano en píxeles cuadrados (los mismos en los que el modelo vio la imagen y en los que vienen
+    las cajas). Coronal y sagital se voltean para dejar la cabeza arriba. Devuelve (gris, etiquetas, volteado)."""
+    g = planos.get_slice(gris_u8, plano, idx)
+    g = np.clip(np.rint(planos.slice_to_square(g.astype(np.float32), plano, spacing_xyz, False)), 0, 255).astype(np.uint8)
+    e = planos.slice_to_square(planos.get_slice(etiquetas, plano, idx), plano, spacing_xyz, True)
+    if plano == "axial":
+        return g, e, False
+    return g[::-1], e[::-1], True
+
+
+def voltear_cajas(cajas, alto):
+    """Cajas (x0, y0, x1, y1) de un corte que se volteó en vertical."""
+    if cajas is None:
+        return None
+    boxes = cajas["boxes"].copy()
+    boxes[:, [1, 3]] = alto - cajas["boxes"][:, [3, 1]]
+    return {**cajas, "boxes": boxes}
+
+
+def pixeles_por_corte(etiquetas, plano):
+    """Píxeles con fragmento en cada corte del plano (para abrir el visor en el corte con más hueso)."""
+    ejes = {"axial": (1, 2), "coronal": (0, 2), "sagital": (0, 1)}[plano]
+    return np.count_nonzero(etiquetas, axis=ejes)
+
+
 def _fuente(tamano):
     try:
         return ImageFont.load_default(size=tamano)

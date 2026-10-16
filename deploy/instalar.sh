@@ -17,7 +17,7 @@ DIR="$HOME/proyecto_analitica_corte2"
 
 # Solo los archivos de Git LFS que usa app/inferencia.py. Bajar todos (~600 MB, SAM incluido) gasta la cuota
 # mensual de LFS de GitHub y el disco del servidor sin necesidad.
-LFS_INCLUIR="resultados/modelos/entrenamiento_multitarea/modelo_multitarea_final.pt"
+LFS_INCLUIR="resultados/modelos/entrenamiento_multitarea_axial/modelo_multitarea_axial.pt,resultados/modelos/entrenamiento_multitarea_coronal/modelo_multitarea_coronal.pt,resultados/modelos/entrenamiento_multitarea_sagital/modelo_multitarea_sagital.pt"
 
 echo "== Paquetes del sistema"
 sudo apt-get update -y
