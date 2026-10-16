@@ -1,0 +1,11 @@
+modelo,caso,cortes_sin_pelvis,sin_pelvis_con_caja
+actual,035,78,35
+actual,037,110,91
+actual,067,118,49
+actual,071,53,39
+actual,079,35,15
+negativos,035,78,28
+negativos,037,110,73
+negativos,067,118,37
+negativos,071,53,35
+negativos,079,35,15

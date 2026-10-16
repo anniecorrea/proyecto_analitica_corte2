@@ -1,0 +1,18 @@
+# Servicio systemd: deja el frontend corriendo en el servidor y lo reinicia si se cae o si se reinicia la maquina.
+# deploy/instalar.sh lo instala solo (ajusta usuario y carpeta). A mano, en el servidor:
+#   sudo cp deploy/pengwin.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now pengwin
+[Unit]
+Description=PENGWIN - frontend Streamlit
+After=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/proyecto_analitica_corte2
+Environment=PENGWIN_DEVICE=cpu
+ExecStart=/home/ubuntu/proyecto_analitica_corte2/.venv/bin/streamlit run app/streamlit_app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -48,6 +48,8 @@ resultados/cache/
 # last_*.pth solo sirven para reanudar un entrenamiento; las corridas smoke son de prueba
 resultados/modelos/**/last_*.pth
 resultados/modelos/*_smoke/
+resultados/metricas/*_smoke/
+resultados/figuras/*_smoke/
 
 # Archivos temporales de Word
 ~$*

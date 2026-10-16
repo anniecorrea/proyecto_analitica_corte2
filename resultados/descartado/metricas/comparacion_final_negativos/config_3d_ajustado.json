@@ -1,0 +1,24 @@
+{
+  "decode": {
+    "center_threshold": 0.55,
+    "min_center_distance": 26,
+    "min_instance_pixels": 9,
+    "fallback_components": true,
+    "det_gate": 0.05,
+    "gate_min_run": 5,
+    "box_margin": 8
+  },
+  "link": {
+    "min_overlap": 0.05,
+    "overlap_mode": "iou",
+    "max_gap": 1,
+    "many_to_one": true
+  },
+  "post": {
+    "min_slices": 5,
+    "min_voxels": 500,
+    "min_score": 0.0,
+    "absorb_max_voxels": 100000,
+    "absorb_min_contact": 0.0
+  }
+}

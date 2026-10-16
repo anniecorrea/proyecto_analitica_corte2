@@ -1,0 +1,51 @@
+{
+  "caso": "035",
+  "modelo": "modelo_multitarea_axial.pt, modelo_multitarea_coronal.pt, modelo_multitarea_sagital.pt",
+  "creado": "2026-10-15 21:19",
+  "resultados": [
+    {
+      "dispositivo": "cuda",
+      "hardware": "NVIDIA GeForce RTX 5060",
+      "hilos_cpu": null,
+      "precision_mixta": true,
+      "ms_por_imagen": 24.846603174597792,
+      "ms_por_imagen_std": 1.3846483367133637,
+      "repeticiones": 3,
+      "imagenes_por_repeticion": 42,
+      "s_por_volumen": 35.89422082901001,
+      "cortes_volumen": 1164,
+      "s_por_plano": {
+        "axial": 12.205591440200806,
+        "coronal": 10.210395812988281,
+        "sagital": 13.478233575820923
+      },
+      "fragmentos_por_plano": {
+        "axial": 3,
+        "coronal": 3,
+        "sagital": 4
+      }
+    },
+    {
+      "dispositivo": "cpu",
+      "hardware": "AMD Ryzen 5 5600XT 6-Core Processor",
+      "hilos_cpu": 6,
+      "precision_mixta": false,
+      "ms_por_imagen": 95.27786269841776,
+      "ms_por_imagen_std": 0.6260323314721361,
+      "repeticiones": 3,
+      "imagenes_por_repeticion": 42,
+      "s_por_volumen": 122.97302150726318,
+      "cortes_volumen": 1164,
+      "s_por_plano": {
+        "axial": 44.35757780075073,
+        "coronal": 30.428844213485718,
+        "sagital": 48.18659949302673
+      },
+      "fragmentos_por_plano": {
+        "axial": 3,
+        "coronal": 3,
+        "sagital": 4
+      }
+    }
+  ]
+}

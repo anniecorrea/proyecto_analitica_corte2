@@ -7,12 +7,22 @@ import streamlit as st
 import inferencia
 import visualizacion as vis
 
-st.title("🦴 Predicción de fragmentos")
-st.write("Sube una tomografía `.mha` (la imagen, no la etiqueta). El modelo recorre todos los cortes, detecta y "
-         "segmenta los fragmentos y los une en 3D. No usa ninguna anotación real.")
+# El cargador no muestra el límite de tamaño ni los formatos aceptados (solo "Subir imagen").
+st.markdown("<style>[data-testid='stFileUploaderDropzoneInstructions'] {display: none;}</style>",
+            unsafe_allow_html=True)
+
+st.title("PENGWIN")
+st.markdown(
+    "**Detección, segmentación y medición de fracturas pélvicas en tomografía computarizada.**\n\n"
+    "Este proyecto académico, basado en el reto PENGWIN, analiza una tomografía de pelvis con tres modelos de "
+    "aprendizaje profundo, uno por plano anatómico (**axial, coronal y sagital**). Cada modelo localiza el sacro y los "
+    "dos huesos coxales, separa los fragmentos óseos de cada hueso y los une en 3D. Para cada fragmento se informa su "
+    "volumen y la distancia de separación al fragmento principal de su hueso.\n\n"
+    "**Cómo usar la página:** sube una tomografía." \
+    "Las métricas de entrenamiento y validación están en **Dashboard de resultados**.")
 
 
-@st.cache_resource(show_spinner="Cargando el modelo...")
+@st.cache_resource(show_spinner=False)
 def obtener_pipeline():
     return inferencia.cargar_pipeline()
 
@@ -23,112 +33,200 @@ except Exception as e:                    # pesos sin `git lfs pull`, cuaderno s
     st.error(f"No se pudo cargar el modelo: {e}")
     st.stop()
 
-info = pipeline["info"]
 colores = pipeline["ns"]["TARGET_COLORS"]
 regiones = pipeline["ns"]["REGION_OF_CLASS"]
-with st.sidebar:
-    st.subheader("Modelo")
-    st.caption(f"`{info['modelo']}` · etapa {info['etapa']}, época {info['epoca']} · "
-               f"{info['canales_entrada']} canal(es) · {info['dispositivo']}")
-    st.caption(f"Configuración 3D ajustada con val ({info['config_3d_creada']})")
-    st.subheader("Leyenda")
-    for c, nombre in regiones.items():
-        st.markdown(f"<span style='color:{colores[c]}'>■</span> {nombre.replace('_', ' ')}", unsafe_allow_html=True)
+CLASE_DE_REGION = {r: c for c, r in regiones.items()}
 
-# ---------------------------------------------------------------------------------------------------------------
-# Entrada
-# ---------------------------------------------------------------------------------------------------------------
-locales = inferencia.casos_locales()
-fuente = st.radio("Origen de la tomografía", ["Subir archivo .mha", "Caso local de data_mha/"], horizontal=True,
-                  disabled=not locales)
-if fuente == "Subir archivo .mha":
-    archivo = st.file_uploader("Tomografía (.mha)", type=["mha"])
-    origen, nombre = (archivo.getvalue(), archivo.name) if archivo else (None, None)
-else:
-    ruta = st.selectbox("Caso", locales, format_func=lambda p: f"{p.parent.name}/{p.name}")
-    origen, nombre = ruta, ruta.name
 
-clave = None
-if origen is not None:
-    clave = hashlib.md5(origen).hexdigest() if isinstance(origen, bytes) else str(origen)
+# La imagen y su predicción viven en session_state: al ir al dashboard y volver, el cargador aparece vacío (Streamlit
+# borra los widgets de la página que no se muestra), pero los resultados siguen ahí. Solo se borran si el usuario
+# quita el archivo del cargador.
+def _al_cambiar_imagen():
+    if st.session_state.get("archivo_imagen") is None:
+        st.session_state.pop("prediccion", None)
+        st.session_state.pop("referencia", None)
 
-if st.button("Predecir fragmentos", type="primary", disabled=origen is None):
-    st.session_state.pop("prediccion", None)
-    gc.collect()
-    try:
-        with st.spinner("Leyendo la tomografía..."):
-            volume_hu, image_itk = inferencia.leer_mha(origen)
-        with st.spinner(f"Prediciendo {volume_hu.shape[0]} cortes en {info['dispositivo']}. "
-                        "Puede tardar unos minutos..."):
-            res = inferencia.predecir_volumen(pipeline, volume_hu, image_itk, case_id=nombre)
-        header = inferencia.cabecera(image_itk)
-        st.session_state["prediccion"] = {
-            "clave": clave, "nombre": nombre, "res": res, "gris": vis.ventanear(volume_hu),
-            "mha": inferencia.mha_de_prediccion(res["instance_volume"], header),
-        }
-    except Exception as e:
-        st.error(f"Falló la predicción: {e}")
-    finally:
-        volume_hu = image_itk = None
+
+st.subheader("Subir imagen")
+archivo = st.file_uploader("Subir imagen", type=["mha", "nii", "gz"], label_visibility="collapsed",
+                           key="archivo_imagen", on_change=_al_cambiar_imagen)
+
+if archivo is not None:
+    origen, nombre = archivo.getvalue(), archivo.name
+    clave = hashlib.md5(origen).hexdigest()
+    if st.session_state.get("prediccion", {}).get("clave") != clave:
+        st.session_state.pop("prediccion", None)
+        st.session_state.pop("referencia", None)
         gc.collect()
+        volume = None
+        try:
+            with st.spinner("Leyendo imagen"):
+                volume, spacing = inferencia.leer_canonico(origen, nombre)
+            del origen
+            total = sum(volume.shape)                  # cortes de los tres planos
+            barra = st.progress(0.0, text="Analizando la tomografía")
+            hechos, por_plano = 0, {}
+            for plano in inferencia.PLANOS:
+                texto = f"Modelo {inferencia.NOMBRE_PLANO[plano].lower()}"
+                res = inferencia.predecir_plano(
+                    pipeline, plano, volume, spacing, case_id=nombre,
+                    progreso=lambda k, n, base=hechos, t=texto: barra.progress(min((base + k) / total, 1.0),
+                                                                               text=f"{t}: corte {k} de {n}"))
+                hechos += inferencia.planos.n_slices(volume.shape, plano)
+                tabla, inst = res["fragmentos"], res["instance_volume"]
+                por_plano[plano] = {
+                    "res": res,
+                    "lut": vis.tabla_de_colores(dict(zip(tabla["fragment_id"], tabla["class"])), colores, int(inst.max())),
+                    "etiquetas": {int(f["fragment_id"]): vis.etiqueta_fragmento(f) for _, f in tabla.iterrows()},
+                }
+                gc.collect()
+            barra.empty()
+            st.session_state["prediccion"] = {
+                "clave": clave, "nombre": nombre, "spacing": spacing, "forma": volume.shape, "planos": por_plano,
+                "gris": vis.ventanear(volume), "mip": inferencia.mip_hueso(volume), "figuras": {},
+            }
+        except Exception as e:
+            st.error(f"No se pudo procesar la imagen: {e}")
+            st.stop()
+        finally:
+            volume = None
+            gc.collect()
 
 pred = st.session_state.get("prediccion")
 if pred is None:
-    st.info("Elige una tomografía y pulsa **Predecir fragmentos**.")
     st.stop()
-if pred["clave"] != clave:
-    st.caption(f"Mostrando el resultado anterior de `{pred['nombre']}`.")
+if archivo is None:
+    st.caption(f"Mostrando los resultados de **{pred['nombre']}**. Para analizar otra tomografía, súbela arriba.")
+
+spacing = pred["spacing"]
 
 # ---------------------------------------------------------------------------------------------------------------
-# Resultado
+# Etiqueta de referencia: la del dataset con el mismo nombre que la tomografía (data_mha/), si existe.
 # ---------------------------------------------------------------------------------------------------------------
-res, gris = pred["res"], pred["gris"]
-inst = res["instance_volume"]
-tabla = res["fragmentos"]
-Z, H, W = inst.shape
+ref = st.session_state.get("referencia")
+if ref is not None and ref["clave_imagen"] != pred["clave"]:
+    ref = None
+fuente_ref = None
+ruta_ref = inferencia.etiqueta_local(pred["nombre"])
+if ref is None and ruta_ref is not None:
+    fuente_ref = (str(ruta_ref), ruta_ref, ruta_ref.name)
+rechazada = fuente_ref is not None and st.session_state.get("referencia_rechazada") == (pred["clave"], fuente_ref[0])
+if rechazada:
+    st.warning(f"La etiqueta {fuente_ref[2]} no se pudo usar con esta tomografía.")
+if fuente_ref is not None and (ref is None or ref["clave"] != fuente_ref[0]) and not rechazada:
+    ref = None
+    st.session_state["referencia_rechazada"] = (pred["clave"], fuente_ref[0])     # se borra abajo si la etiqueta vale
+    try:
+        with st.spinner("Leyendo la etiqueta de referencia"):
+            label, sp_ref = inferencia.leer_canonico(fuente_ref[1], fuente_ref[2], es_etiqueta=True)
+        if label.shape != tuple(pred["forma"]) or not np.allclose(sp_ref, spacing, atol=1e-3):
+            st.error(f"La etiqueta {fuente_ref[2]} no corresponde a esta tomografía (tamaño {label.shape} frente a "
+                     f"{tuple(pred['forma'])}).")
+        elif label.min() < 0 or label.max() > 30:
+            st.error("La etiqueta no usa los IDs de PENGWIN (1-10 sacro, 11-20 coxal izquierdo, 21-30 coxal derecho).")
+        else:
+            tabla_ref = inferencia.fragmentos_referencia(label, spacing, case_id=pred["nombre"])
+            ref = {"clave": fuente_ref[0], "clave_imagen": pred["clave"], "nombre": fuente_ref[2],
+                   "volumen": label.astype(np.uint8), "fragmentos": tabla_ref,
+                   "lut": vis.tabla_de_colores({i: CLASE_DE_REGION[inferencia.region_de_id(i)] for i in range(1, 31)},
+                                               colores, 30),
+                   "etiquetas": {int(f["fragment_id"]): vis.etiqueta_fragmento(f) for _, f in tabla_ref.iterrows()}}
+            st.session_state["referencia"] = ref
+            st.session_state.pop("referencia_rechazada", None)
+        del label
+    except Exception as e:
+        st.error(f"No se pudo leer la etiqueta: {e}")
+    gc.collect()
 
-st.subheader(f"Resultado · {pred['nombre']}")
-m = st.columns(5)
-m[0].metric("Fragmentos 3D", len(tabla))
-for i, (c, nombre_region) in enumerate(regiones.items(), start=1):
-    m[i].metric(nombre_region.replace("_", " ").capitalize(), int((tabla["class"] == c).sum()))
-m[4].metric("Tiempo", f"{res['segundos']:.0f} s")
+# ---------------------------------------------------------------------------------------------------------------
+# Plano (cada uno con su modelo) y fragmentos: los de la imagen (si hay etiqueta) y los que predice el modelo
+# ---------------------------------------------------------------------------------------------------------------
+plano = st.radio("Plano", inferencia.PLANOS, format_func=inferencia.NOMBRE_PLANO.get, horizontal=True,
+                 key="plano_detalle", help="Cada plano tiene su propio modelo: cambia los fragmentos predichos, el "
+                                          "corte que se ve y la reconstrucción 3D.")
+dp = pred["planos"][plano]
+res, lut = dp["res"], dp["lut"]
+nombre_modelo = f"modelo {inferencia.NOMBRE_PLANO[plano].lower()}"
+if not res["pelvis"]["presente"]:
+    st.warning(inferencia.control_pelvis.MENSAJE_SIN_PELVIS)
+c = st.columns(2)
+c[0].metric("Fragmentos en la imagen", len(ref["fragmentos"]) if ref is not None else "sin etiqueta", border=True)
+c[1].metric(f"Fragmentos predichos ({nombre_modelo})", len(res["fragmentos"]), border=True)
 
-if len(tabla) == 0:
-    st.warning("El modelo no encontró fragmentos en este volumen.")
 
-lut = vis.tabla_de_colores(dict(zip(tabla["fragment_id"], tabla["class"])), colores, int(inst.max()))
-alpha = st.slider("Opacidad de la máscara", 0.0, 1.0, 0.5, 0.05)
+def vista(destino, inst, lut_vista, textos):
+    """Vista frontal con los fragmentos coloreados (se calcula una vez y queda en la sesión)."""
+    if "vista" not in destino:
+        destino["vista"] = vis.vista_fragmentos(pred["mip"], inst, lut_vista, spacing, inferencia.UMBRAL_HUESO_HU, textos)
+    return destino["vista"]
 
-z_con = np.flatnonzero(inst.any(axis=(1, 2)))
-z_ini = int(z_con[len(z_con) // 2]) if len(z_con) else Z // 2
 
-axial, coronal, mip = st.tabs(["Corte axial", "Corte coronal", "Proyección (MIP)"])
-with axial:
-    z = st.slider("Corte z", 0, Z - 1, z_ini)
-    ids = [int(i) for i in np.unique(inst[z]) if i]
-    st.image(vis.vista_axial(gris, inst, lut, z, alpha), width="stretch",
-             caption=f"z = {z} · fragmentos en el corte: {ids or 'ninguno'}")
-with coronal:
-    y = st.slider("Corte y", 0, H - 1, H // 2)
-    st.image(vis.vista_coronal(gris, inst, lut, y, res["spacing_xyz"], alpha), width="stretch")
-with mip:
-    st.image(vis.vista_mip(gris, inst, lut, res["spacing_xyz"], alpha), width="stretch",
-             caption="Proyección coronal de máxima intensidad: todos los fragmentos a la vez.")
+if ref is not None:
+    c[0].image(vista(ref, ref["volumen"], ref["lut"], ref["etiquetas"]), width="stretch",
+               caption="Fragmentos reales (etiqueta de referencia)")
+if len(res["fragmentos"]):
+    c[1].image(vista(dp, res["instance_volume"], lut, dp["etiquetas"]), width="stretch",
+               caption=f"Fragmentos que predice el {nombre_modelo}")
+st.caption("Vista frontal de la pelvis: cada color es un fragmento y la etiqueta indica su hueso y su distancia al "
+           "fragmento principal. Un fragmento que queda detrás de otro solo se ve por su etiqueta; en el visor de cortes "
+           "se ve completo.")
 
-st.subheader("Fragmentos")
-st.dataframe(inferencia.tabla_para_mostrar(tabla), hide_index=True, width="stretch",
-             column_config={"Volumen (cm³)": st.column_config.NumberColumn(format="%.2f"),
-                            "Confianza media": st.column_config.ProgressColumn(min_value=0.0, max_value=1.0)})
+# ---------------------------------------------------------------------------------------------------------------
+# Visualizador 1: volumen crudo (MIP con umbral HU, sin modelo)
+# ---------------------------------------------------------------------------------------------------------------
+st.header("Imagen original")
+izq, _ = st.columns([2, 1])
+izq.image(vis.imagen_mip_hueso(pred["mip"], spacing, inferencia.UMBRAL_HUESO_HU), width="stretch")
 
-base = str(pred["nombre"]).removesuffix(".mha")
-d1, d2 = st.columns(2)
-d1.download_button("Descargar máscara de fragmentos (.mha)", pred["mha"], file_name=f"pred_{base}.mha",
-                   mime="application/octet-stream")
-d2.download_button("Descargar tabla (.csv)", tabla.to_csv(index=False).encode("utf-8"),
-                   file_name=f"pred_{base}_fragmentos.csv", mime="text/csv")
+# ---------------------------------------------------------------------------------------------------------------
+# Visualizador 2: corte por corte en el plano elegido
+# ---------------------------------------------------------------------------------------------------------------
+st.header("Inferencia corte por corte")
+st.markdown(" &nbsp; ".join(f"<span style='color:{colores[c]}'>&#9632;</span> {inferencia.NOMBRE_REGION[r]}"
+                            for c, r in regiones.items()), unsafe_allow_html=True)
 
-with st.expander("Detalles del pipeline"):
-    st.write(f"Cortes con alguna caja detectada: {res['cortes_con_hueso']} de {Z}")
-    st.write("Limpieza 3D:", res["log_limpieza"])
-    st.write(f"Eventos de fusión/división para revisar: {len(res['eventos'])}")
+
+@st.fragment
+def visor_cortes():
+    # Solo este bloque se vuelve a dibujar al mover el slider (la malla 3D no se recalcula).
+    ver_ref = ref is not None and st.toggle("Ver la referencia en lugar de la predicción", key="ver_referencia")
+    inst = ref["volumen"] if ver_ref else res["instance_volume"]
+    n = inferencia.planos.n_slices(inst.shape, plano)
+    if "pixeles" not in dp:
+        dp["pixeles"] = vis.pixeles_por_corte(res["instance_volume"], plano)
+    pixeles = dp["pixeles"]
+    inicio = int(pixeles.argmax()) if pixeles.any() else n // 2
+    z = st.slider(f"Corte {inferencia.NOMBRE_PLANO[plano].lower()}", 0, n - 1, inicio, key=f"corte_{plano}")
+    gris, etiquetas, volteado = vis.corte_del_plano(pred["gris"], inst, plano, z, spacing)
+    cajas = None if ver_ref else res["cajas"][z]
+    if volteado:
+        cajas = vis.voltear_cajas(cajas, gris.shape[0])
+    izq, _ = st.columns([2, 1])
+    izq.image(vis.corte_anotado(gris, etiquetas, ref["lut"] if ver_ref else lut, cajas, colores,
+                                ref["etiquetas"] if ver_ref else dp["etiquetas"]),
+              width="stretch", caption=f"Corte {z + 1} de {n} · {'referencia' if ver_ref else nombre_modelo}")
+
+
+visor_cortes()
+
+# ---------------------------------------------------------------------------------------------------------------
+# Visualizador 3: reconstrucción 3D (la figura se calcula la primera vez que se pide y queda en la sesión)
+# ---------------------------------------------------------------------------------------------------------------
+def figura(clave, inst, fragmentos, lut_figura):
+    if clave not in pred["figuras"]:
+        with st.spinner("Construyendo la reconstrucción 3D"):
+            pred["figuras"][clave] = vis.figura_3d(inst, spacing, fragmentos, lut_figura) if len(fragmentos) else None
+    return pred["figuras"][clave]
+
+
+st.header("Reconstrucción 3D")
+vistas = [(f"Predicción ({nombre_modelo})", plano, res["instance_volume"], res["fragmentos"], lut)]
+if ref is not None:
+    vistas.append(("Referencia", f"referencia:{ref['clave']}", ref["volumen"], ref["fragmentos"], ref["lut"]))
+for pestana, (_, clave, inst, fragmentos, lut_figura) in zip(st.tabs([v[0] for v in vistas]), vistas):
+    with pestana:
+        fig = figura(clave, inst, fragmentos, lut_figura)
+        if fig is None:
+            st.info("No hay fragmentos que reconstruir.")
+        else:
+            st.plotly_chart(fig, width="stretch", key=f"fig_{clave}")

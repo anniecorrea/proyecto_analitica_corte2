@@ -34,7 +34,7 @@ from sklearn.metrics import f1_score, roc_auc_score
 ROOT = Path(__file__).resolve().parents[1]   # raiz del repositorio (este archivo vive en src/)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-from src.rutas import (CACHE_DIR, DATASET_CSV, FIGURAS_DIR, MANIFEST_CSV, METRICAS_DIR,  # noqa: E402
+from src.rutas import (CACHE_DIR, DATASET_CSV, DATOS_DIR, FIGURAS_DIR, MANIFEST_CSV, METRICAS_DIR,  # noqa: E402
                        MODELOS_DIR, NOTEBOOKS_DIR)
 from src.entrada_25d import in_channels_del_modelo  # noqa: E402
 from src.deteccion_grid import NMS_CONFIG  # noqa: E402
@@ -52,9 +52,25 @@ DATASET_PATH = DATASET_CSV
 MANIFEST_PATH = MANIFEST_CSV
 OUT_DIR = METRICAS_DIR / "evaluacion"      # metricas, latencia y resultados por corte
 FIG_DIR = FIGURAS_DIR / "evaluacion"       # galeria de peores casos y aciertos
-DEFAULT_CHECKPOINT = MODELOS_DIR / "entrenamiento_multitarea" / "modelo_multitarea_final.pt"
-DEFAULT_CABEZA = MODELOS_DIR / "nms_pertenencia" / "cabeza_pertenencia.pt"   # etapa D (Fabian)
+DEFAULT_CHECKPOINT = MODELOS_DIR / "entrenamiento_multitarea" / "modelo_multitarea_final.pt"   # modelo anterior (solo axial)
+PLANOS = ("axial", "coronal", "sagital")
+PLANOS_NOTEBOOK = NOTEBOOKS_DIR / "Entrenamiento_multitarea_planos.ipynb"
+
+
+def checkpoint_del_plano(plano: str) -> Path:
+    """Modelo exportado por Entrenamiento_multitarea_planos.ipynb para ese plano."""
+    return MODELOS_DIR / f"entrenamiento_multitarea_{plano}" / f"modelo_multitarea_{plano}.pt"
+
+
+CABEZAS_DIR = MODELOS_DIR / "nms_pertenencia"   # cabezas de pertenencia (etapa D, Fabian)
 NMS_REFERENCIA = "src.deteccion_grid:nms_por_clase"   # el NMS que usa el sistema (via pipeline_pengwin)
+
+
+def cabeza_del_plano(plano: str | None) -> Path:
+    """Cabeza de pertenencia entrenada (etapa D) sobre el tronco de ese plano; None = modelo anterior."""
+    return CABEZAS_DIR / ("cabeza_pertenencia.pt" if plano is None else f"cabeza_pertenencia_{plano}.pt")
+
+
 CLASS_IDS = (1, 2, 3)
 N_WORST_EXAMPLES = 5   # el informe pide una galeria de los cinco peores casos
 N_BEST_EXAMPLES = 3
@@ -167,7 +183,7 @@ def _sha1(path: Path, length: int = 12) -> str:
     return digest.hexdigest()[:length]
 
 
-def _load_project_components() -> None:
+def _load_project_components(plane_mode: bool = False) -> None:
     global df, slice_manifest, DATA_VERSION
     for path in (DATASET_PATH, MANIFEST_PATH):
         if not path.is_file():
@@ -213,14 +229,15 @@ def _load_project_components() -> None:
         NOTEBOOKS_DIR / "cbam.ipynb",
         {"ChannelAttention", "SpatialAttention", "CBAM", "CompuertaResidualCBAM"},
     )
-    _load_notebook_definitions(
-        NOTEBOOKS_DIR / "Entrenamiento_multitarea.ipynb",
-        {
-            "_VolumeSlices", "LeanPengwinDetectionDataset", "build_or_load_cache",
-            "_read_cache", "pad_boxes", "unpad_boxes", "CachedSliceDataset",
-            "collate_slices", "MultiTaskNet",
-        },
-    )
+    if not plane_mode:   # modelo anterior; los modelos por plano cargan sus piezas en _load_plane_components
+        _load_notebook_definitions(
+            NOTEBOOKS_DIR / "Entrenamiento_multitarea.ipynb",
+            {
+                "_VolumeSlices", "LeanPengwinDetectionDataset", "build_or_load_cache",
+                "_read_cache", "pad_boxes", "unpad_boxes", "CachedSliceDataset",
+                "collate_slices", "MultiTaskNet",
+            },
+        )
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
     try:
@@ -230,6 +247,63 @@ def _load_project_components() -> None:
     _COMPONENTS["GridDetectionHead"] = GridDetectionHead
     _COMPONENTS["postprocess"] = postprocess
     _COMPONENTS["CLASS_NAMES"] = CLASS_NAMES
+
+
+def _load_plane_components(plano: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Piezas de Entrenamiento_multitarea_planos.ipynb para evaluar un modelo por plano con LOS MISMOS datos y el
+    MISMO codigo del entrenamiento: manifiestos, cache de cortes (orientacion canonica, pixeles cuadrados, 2.5D),
+    PlaneSliceDataset (canal de posicion del sagital con la misma linea media de val) y MultiTaskNet.
+
+    La cache se identifica con la misma clave que uso el entrenamiento (DATA_VERSION + split + cortes): si nada cambio,
+    se reutiliza la que construyo el cuaderno; si cambio algo (planos.py, orientacion.py, manifiestos, dataset.csv),
+    se reconstruye con la misma funcion. Devuelve la configuracion del entrenamiento y si los datos coinciden."""
+    import shutil
+
+    from src import orientacion, planos
+    from src.orientacion import load_canonical
+    from src.planos import make_sample, position_value
+
+    config = payload.get("training_config") or {}
+    data_version_train = config.get("DATA_VERSION") or {}
+    if config.get("PLANE", plano) != plano:
+        raise ValueError(f"El checkpoint es del plano {config.get('PLANE')!r}, no de {plano!r}.")
+    n_img = int(config.get("N_IMG_CHANNELS", 3))
+    _COMPONENTS.update({
+        "shutil": shutil, "planos": planos, "load_canonical": load_canonical, "make_sample": make_sample,
+        "position_value": position_value, "TARGETS_DIR": DATOS_DIR / "targets",
+        "log": lambda msg="": print(msg, flush=True),
+        # mismos valores que configurar_plano() del cuaderno (se leen del checkpoint, no se suponen)
+        "SEED": int(config.get("SEED", 42)), "N_IMG": n_img, "N_IMG_CHANNELS": n_img,
+        "MIN_PIXELS": int(config.get("MIN_PIXELS", 20)),
+        "CACHE_IMG_DTYPE": data_version_train.get("dtype", "float16"),
+        "POS_SIGMA_MM": float(config.get("POS_SIGMA_MM", 15.0)), "POS_P_FOV": float(config.get("POS_P_FOV", 0.3)),
+    })
+    _load_notebook_definitions(
+        PLANOS_NOTEBOOK,
+        {
+            "ruta_manifiesto", "leer_manifiestos", "_etiqueta_cache", "_bytes_por_corte", "pad_boxes",
+            "unpad_boxes", "_leer_cache", "seleccionar", "construir_o_cargar_cache", "CachedSliceDataset",
+            "collate_slices", "_entero_de_caso", "PlaneSliceDataset", "MultiTaskNet",
+        },
+    )
+    ruta = _COMPONENTS["ruta_manifiesto"]
+    for kind in ("pos", "neg"):
+        if not ruta(plano, kind).is_file():
+            raise FileNotFoundError(
+                f"Falta el manifiesto {ruta(plano, kind)} (lo genera Entrenamiento_multitarea_planos.ipynb)."
+            )
+    data_version = {
+        "version": data_version_train.get("version", "planos-25d-neg-1"), "plane": plano, "n_img": n_img,
+        "dtype": _COMPONENTS["CACHE_IMG_DTYPE"], "min_pixels": _COMPONENTS["MIN_PIXELS"], "image_size": IMAGE_SIZE,
+        "dataset_csv": _sha1(DATASET_PATH), "planos_py": _sha1(Path(planos.__file__)),
+        "orientacion_py": _sha1(Path(orientacion.__file__)),
+        "manifiesto_pos": _sha1(ruta(plano, "pos")), "manifiesto_neg": _sha1(ruta(plano, "neg")),
+    }
+    _COMPONENTS["DATA_VERSION"] = data_version
+    cambios = sorted(k for k in data_version if data_version_train.get(k) != data_version[k])
+    if cambios:
+        print(f"AVISO [{plano}]: los datos difieren de los del entrenamiento en {cambios}; la cache se reconstruye.")
+    return {"config": config, "datos_iguales_al_entrenamiento": not cambios, "diferencias_datos": cambios}
 
 
 def _resolve_repo_path(path: Path, description: str) -> Path:
@@ -315,13 +389,16 @@ def _load_model(checkpoint: Path, device: torch.device) -> tuple[nn.Module, dict
         raise ValueError(f"El checkpoint usa image_size={architecture['image_size']}, se esperaba {IMAGE_SIZE}.")
     if architecture.get("grid_size", GRID_SIZE) != GRID_SIZE:
         raise ValueError(f"El checkpoint usa grid_size={architecture['grid_size']}, se esperaba {GRID_SIZE}.")
-    model = _COMPONENTS["MultiTaskNet"](
+    model_args = [
         architecture["backbone_name"],
         architecture["use_cbam"],
         architecture.get("use_gate", True),
         architecture.get("use_skips", True),
         in_channels_del_modelo(payload),
-    ).to(device)
+    ]
+    if "image_channels" in architecture:   # modelos por plano: el sagital recibe 4 canales y su decoder solo 3
+        model_args.append(int(architecture["image_channels"]))
+    model = _COMPONENTS["MultiTaskNet"](*model_args).to(device)
     model.load_state_dict(payload["model_state_dict"])
     model.eval()
     return model, payload
@@ -332,12 +409,15 @@ def _load_cabeza_pertenencia(
 ) -> tuple[nn.Module, dict[str, Any]]:
     """Carga la cabeza de pertenencia (etapa D) y verifica que se entreno sobre ESTE tronco.
 
-    La cabeza aprende sobre el f4 de un checkpoint concreto. Si el tronco cambia (otra arquitectura u
-    otro entrenamiento), los pesos de la cabeza ya no significan lo mismo aunque las formas coincidan:
-    cargaria sin error y daria metricas falsas. Por eso se compara el sha256 guardado en el meta.
+    La cabeza aprende sobre el f4 de un checkpoint concreto. Si el tronco cambia (otro plano, otra arquitectura u
+    otro entrenamiento), los pesos de la cabeza ya no significan lo mismo aunque las formas coincidan: cargaria
+    sin error y daria metricas falsas. Por eso se compara el sha256 guardado en el meta.
     """
     if not path.is_file():
-        raise FileNotFoundError(f"No existe la cabeza de pertenencia: {path}")
+        raise FileNotFoundError(
+            f"No existe la cabeza de pertenencia {path.name}. Entrenala sobre {checkpoint.name} "
+            "(etapa D en nms_pertenencia_pipeline.ipynb) antes de evaluar este modelo."
+        )
     meta_path = path.with_name(f"{path.stem}_meta.json")
     if not meta_path.is_file():
         raise FileNotFoundError(f"Falta {meta_path.name}: sin el no se puede verificar el tronco.")
@@ -345,14 +425,30 @@ def _load_cabeza_pertenencia(
     tronco_actual = hashlib.sha256(checkpoint.read_bytes()).hexdigest()[:16]
     if meta.get("tronco_sha256_16") != tronco_actual:
         raise ValueError(
-            f"La cabeza de pertenencia se entreno sobre otro tronco "
-            f"(meta: {meta.get('tronco_sha256_16')!r}, checkpoint actual: {tronco_actual!r}). "
+            f"La cabeza {path.name} se entreno sobre otro tronco "
+            f"(meta: {meta.get('tronco_sha256_16')!r}, {checkpoint.name}: {tronco_actual!r}). "
             "Reentrenala (etapa D en nms_pertenencia_pipeline.ipynb) antes de evaluar."
         )
     head = PertenenciaHead().to(device)
     head.load_state_dict(torch.load(path, map_location=device, weights_only=True))
     head.eval()
     return head, meta
+
+
+class _DecoderDelSistema(nn.Module):
+    """Adaptador entre MultiTaskNet y pipeline_pengwin.inferir_cortes.
+
+    inferir_cortes llama seg_decoder(imagen, piramide, priors, output_size). Los modelos por plano pueden recibir un
+    canal de posicion extra (sagital) que el decoder NO debe ver: se recorta igual que hace MultiTaskNet.segment.
+    El modelo anterior no tiene image_channels y recibe la imagen completa.
+    """
+    def __init__(self, model: nn.Module):
+        super().__init__()
+        self.model = model
+
+    def forward(self, image, features, region_priors, output_size=(IMAGE_SIZE, IMAGE_SIZE)):
+        canales = getattr(self.model, "image_channels", image.shape[1])
+        return self.model.seg_decoder(image[:, :canales], features, region_priors, output_size=output_size)
 
 
 def _build_componentes(model: nn.Module, cls_head: nn.Module) -> dict[str, Any]:
@@ -364,7 +460,7 @@ def _build_componentes(model: nn.Module, cls_head: nn.Module) -> dict[str, Any]:
         "backbone": model.backbone,
         "cbam": model.cbam,
         "det_head": model.det_head,
-        "seg_decoder": model.seg_decoder,
+        "seg_decoder": _DecoderDelSistema(model),
         "cls_head": cls_head,
         "features_fn": _COMPONENTS["backbone_feature_pyramid"],
         "priors_fn": _COMPONENTS["build_detection_region_priors"],
@@ -719,19 +815,20 @@ def _save_example(
     prediction: np.ndarray,
     sam_prediction: np.ndarray | None,
     title: str,
+    origin: str = "upper",
 ) -> None:
     panels = [("Referencia", ground_truth), ("Modelo", prediction)]
     if sam_prediction is not None:
         panels.append(("SAM", sam_prediction))
     fig, axes = plt.subplots(1, len(panels), figsize=(5 * len(panels), 5))
     for axis, (panel_title, mask) in zip(np.atleast_1d(axes), panels):
-        axis.imshow(image[image.shape[0] // 2], cmap="gray", vmin=0, vmax=1)   # corte central (2.5D: z)
+        axis.imshow(image[image.shape[0] // 2], cmap="gray", vmin=0, vmax=1, origin=origin)   # corte central (2.5D: z)
         overlay = np.zeros((*mask.shape, 4), dtype=np.float32)
         for class_id, color in REGION_COLORS.items():
             selected = mask == class_id
             overlay[selected, :3] = color
             overlay[selected, 3] = 0.55
-        axis.imshow(overlay)
+        axis.imshow(overlay, origin=origin)
         axis.set_title(panel_title)
         axis.axis("off")
     fig.suptitle(title)
@@ -749,9 +846,8 @@ def _run_pipeline(
     tronco -> cabeza grid -> NMS por clase (con su tope por clase) -> priors -> decoder -> instancias
     -> cabeza de pertenencia.
 
-    Antes este archivo tenia su propia copia del pipeline (sin max_det_per_class y sin la cabeza de
-    pertenencia). Ahora la evaluacion y la latencia miden exactamente lo que entrega el sistema, y si
-    el pipeline cambia, la evaluacion cambia con el.
+    La evaluacion y la latencia miden exactamente lo que entrega el sistema; si el pipeline cambia, la
+    evaluacion cambia con el.
     """
     return inferir_cortes(componentes, images, cfg)
 
@@ -763,6 +859,7 @@ def _measure_latency(
     cfg: dict[str, Any],
     sam_predictor: Any,
     warmup: int = 5,
+    image_channels: int | None = None,
 ) -> dict[str, Any]:
     """Latencia por imagen (batch=1), extremo a extremo y despues de calentar.
 
@@ -791,7 +888,7 @@ def _measure_latency(
         sam_elapsed = None
         if sam_predictor is not None:
             start = time.perf_counter()
-            _sam_semantic(sam_predictor, batch["image"][0].numpy(), salidas[0]["final"])
+            _sam_semantic(sam_predictor, batch["image"][0, :image_channels].numpy(), salidas[0]["final"])
             _sync()
             sam_elapsed = (time.perf_counter() - start) * 1000
         if index >= warmup:
@@ -889,6 +986,54 @@ def _write_comparison_table(metrics: dict[str, Any], out_dir: Path, split: str) 
 
 
 def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
+    """--plano todos: evalua los tres modelos por plano y escribe el resumen; --plano X: uno; --plano anterior: el
+    modelo axial anterior (modelo_multitarea_final.pt) como antes."""
+    planos_pedidos = list(PLANOS) if args.plano == "todos" else [args.plano]
+    if (args.checkpoint is not None or args.cabeza is not None) and len(planos_pedidos) > 1:
+        raise ValueError("--checkpoint y --cabeza solo se pueden usar con un plano (--plano axial|coronal|sagital|anterior).")
+    resultados = {}
+    for plano in planos_pedidos:
+        sub = argparse.Namespace(**vars(args))
+        sub.plano = None if plano == "anterior" else plano
+        if sub.checkpoint is None:
+            sub.checkpoint = DEFAULT_CHECKPOINT if plano == "anterior" else checkpoint_del_plano(plano)
+        if sub.cabeza is None:
+            sub.cabeza = cabeza_del_plano(sub.plano)
+        print(f"\n===== Modelo {plano} ({sub.checkpoint.name}) | split={args.split} =====", flush=True)
+        resultados[plano] = _evaluate_model(sub)
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    if args.plano == "todos":
+        _write_plane_summary(resultados, args.split)
+    return resultados
+
+
+def _write_plane_summary(resultados: dict[str, dict[str, Any]], split: str) -> pd.DataFrame:
+    """Una fila por plano con las metricas de la consigna y si cumple cada objetivo."""
+    filas = []
+    for plano, m in resultados.items():
+        fila = {"plano": plano, "n_cortes": m["n_slices"], "n_casos": m["n_cases"],
+                "datos_iguales_al_entrenamiento": m.get("datos_iguales_al_entrenamiento")}
+        for clave, objetivo in m["targets"].items():
+            fila[clave] = m[clave]
+            fila[f"{clave}_cumple"] = objetivo["met"]
+        fila["modelo_dice_macro"], fila["modelo_iou_macro"] = m.get("modelo_dice_macro"), m.get("modelo_iou_macro")
+        fila["pertenencia_cobertura"] = m.get("pertenencia_cobertura")
+        fila["pertenencia_gt_f1_macro"] = m.get("pertenencia_gt_f1_macro")
+        if "latency" in m:
+            fila["latencia_ms_por_corte"] = m["latency"]["pipeline_ms_mean"]
+        filas.append(fila)
+    tabla = pd.DataFrame(filas)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    tabla.to_csv(OUT_DIR / f"resumen_planos_{split}.csv", index=False)
+    print(f"\nResumen de los tres planos: {OUT_DIR / f'resumen_planos_{split}.csv'}")
+    print(tabla[["plano", "bbox_map50", "bbox_mean_iou", "modelo_fragment_dice", "modelo_fragment_iou",
+                 "pertenencia_f1_macro", "pertenencia_auc_macro_ovr", "pertenencia_cobertura"]].to_string(index=False))
+    return tabla
+
+
+def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
     global DEVICE
     args.checkpoint = _resolve_repo_path(args.checkpoint, "checkpoint")
     args.cabeza = _resolve_repo_path(args.cabeza, "cabeza de pertenencia")
@@ -900,13 +1045,23 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
         "cpu" if args.device == "auto" else args.device
     ))
     _COMPONENTS["DEVICE"] = DEVICE
-    _load_project_components()
+    plane_mode = args.plano is not None
+    out_dir = OUT_DIR / args.plano if plane_mode else OUT_DIR
+    fig_dir = FIG_DIR / args.plano if plane_mode else FIG_DIR
+    _load_project_components(plane_mode)
     _verify_class_convention()
+    plane_info: dict[str, Any] = {}
+    if plane_mode:
+        # el payload se lee antes para cargar las piezas del cuaderno de planos (MultiTaskNet incluida)
+        plane_info = _load_plane_components(
+            args.plano, torch.load(args.checkpoint, map_location="cpu", weights_only=True)
+        )
     model, checkpoint_payload = _load_model(args.checkpoint, DEVICE)
     cls_head, cabeza_meta = _load_cabeza_pertenencia(args.cabeza, args.checkpoint, DEVICE)
     componentes = _build_componentes(model, cls_head)
-    # la caché de cortes debe tener los canales que espera el modelo (3 = entrada 2.5D: carpeta <split>_25d)
-    _COMPONENTS["DATA_VERSION"]["channels"] = in_channels_del_modelo(checkpoint_payload)
+    if not plane_mode:
+        # la caché de cortes debe tener los canales que espera el modelo (3 = entrada 2.5D: carpeta <split>_25d)
+        _COMPONENTS["DATA_VERSION"]["channels"] = in_channels_del_modelo(checkpoint_payload)
     sam_predictor = None
     if args.sam_checkpoint is not None:
         if args.split != "test":
@@ -949,8 +1104,23 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
         "min_instance_pixels": min_instance_pixels,
         "umbral_corte": None,   # solo cortes positivos; el filtro de cortes vacios se evalua con los negativos
     }
-    cache = _COMPONENTS["build_or_load_cache"](args.split)
-    dataset = _COMPONENTS["CachedSliceDataset"](cache)
+    if plane_mode:
+        config = plane_info["config"]
+        positivos, _ = _COMPONENTS["leer_manifiestos"](args.plano)
+        cache = _COMPONENTS["construir_o_cargar_cache"](
+            args.plano, args.split, "pos", positivos[positivos["split"] == args.split]
+        )
+        # igual que la validacion del entrenamiento: linea media del centro del FOV (POS_VAL_MODE) en el sagital
+        dataset = _COMPONENTS["PlaneSliceDataset"](
+            cache, bool(config.get("USE_POSITION_CHANNEL", False)), train=False,
+            val_mode=config.get("POS_VAL_MODE", "fov"), center_mode=config.get("CENTER_MODE", "interior"),
+        )
+        image_channels = int(config.get("N_IMG_CHANNELS", 3))
+    else:
+        cache = _COMPONENTS["build_or_load_cache"](args.split)
+        dataset = _COMPONENTS["CachedSliceDataset"](cache)
+        image_channels = None
+    dataset.need_seg = False   # solo se usan imagen, instancias y cajas: no hace falta generar centros ni offsets
     if len(dataset) == 0:
         raise ValueError(f"El manifiesto no contiene cortes para split={args.split!r}.")
     loader = torch.utils.data.DataLoader(
@@ -1053,7 +1223,7 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
             if sam_predictor is not None:
                 sam_semantic = _sam_semantic(
                     sam_predictor,
-                    batch["image"][index].numpy(),
+                    batch["image"][index, :image_channels].numpy(),
                     final,
                 )
                 _add_semantic_counts(counts, "sam", sam_semantic, gt_semantic)
@@ -1062,7 +1232,7 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
             example = (
                 score,
                 f"{batch['case_id'][index]}_slice_{int(batch['slice_index'][index]):04d}",
-                batch["image"][index].numpy().copy(),
+                batch["image"][index, :image_channels].numpy().copy(),
                 gt_semantic.copy(),
                 model_semantic.copy(),
                 None if sam_semantic is None else sam_semantic.copy(),
@@ -1088,6 +1258,7 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
 
     metrics: dict[str, Any] = {
         "split": args.split,
+        "plano": args.plano or "axial (modelo anterior)",
         "checkpoint": args.checkpoint.relative_to(ROOT).as_posix(),
         "checkpoint_stage": checkpoint_payload.get("selected_from", {}).get(
             "stage", checkpoint_payload.get("stage")
@@ -1111,12 +1282,20 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
         "nms_function": NMS_REFERENCIA,
         "sam": "evaluated" if sam_predictor is not None else "not_requested",
     }
+    if plane_mode:
+        metrics.update({
+            "datos": "cache de cortes de Entrenamiento_multitarea_planos.ipynb (mismo preprocesamiento del entrenamiento)",
+            "datos_iguales_al_entrenamiento": plane_info["datos_iguales_al_entrenamiento"],
+            "diferencias_datos": plane_info["diferencias_datos"],
+            "linea_media_sagital": (plane_info["config"].get("POS_VAL_MODE")
+                                    if plane_info["config"].get("USE_POSITION_CHANNEL") else None),
+        })
     metrics.update(_classification_metrics(all_detections, all_targets, args.cls_threshold))
     pertenencia, resumen_pertenencia, pertenencia_tamano = _pertenencia_metrics(
         pd.concat(pertenencia_pred, ignore_index=True),
         pd.concat(pertenencia_gt, ignore_index=True),
         pd.DataFrame(instance_rows),
-        OUT_DIR,
+        out_dir,
         args.split,
     )
     metrics.update(pertenencia)
@@ -1147,36 +1326,38 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
         },
     }
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig_dir.mkdir(parents=True, exist_ok=True)
     if args.latency_runs > 0:
-        latency = _measure_latency(componentes, dataset, args, pipeline_cfg, sam_predictor)
+        latency = _measure_latency(componentes, dataset, args, pipeline_cfg, sam_predictor,
+                                   image_channels=image_channels)
         metrics["latency"] = latency
-        (OUT_DIR / f"latencia_{args.split}_{DEVICE.type}.json").write_text(
+        (out_dir / f"latencia_{args.split}_{DEVICE.type}.json").write_text(
             json.dumps(latency, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-    (OUT_DIR / f"metricas_{args.split}.json").write_text(
+    (out_dir / f"metricas_{args.split}.json").write_text(
         json.dumps(metrics, ensure_ascii=False, indent=2, allow_nan=True),
         encoding="utf-8",
     )
-    pd.DataFrame([metrics]).to_csv(OUT_DIR / f"metricas_{args.split}.csv", index=False)
-    pd.DataFrame(slice_rows).to_csv(OUT_DIR / f"cortes_{args.split}.csv", index=False)
-    comparison = _write_comparison_table(metrics, OUT_DIR, args.split)
+    pd.DataFrame([metrics]).to_csv(out_dir / f"metricas_{args.split}.csv", index=False)
+    pd.DataFrame(slice_rows).to_csv(out_dir / f"cortes_{args.split}.csv", index=False)
+    comparison = _write_comparison_table(metrics, out_dir, args.split)
 
     for label, ranked in (("peor", worst_examples), ("acierto", best_examples)):
         for rank, example in enumerate(ranked, start=1):
             value, name, image, gt, prediction, sam_prediction = example
             _save_example(
-                FIG_DIR / f"{args.split}_{label}{rank}_{name}.png",
+                fig_dir / f"{args.split}_{label}{rank}_{name}.png",
                 image,
                 gt,
                 prediction,
                 sam_prediction,
                 f"{label} #{rank}: {name} | Dice modelo={value:.3f}",
+                origin="upper" if args.plano in (None, "axial") else "lower",   # coronal/sagital: fila 0 = inferior
             )
 
     print(f"Evaluacion terminada: {len(dataset)} cortes de {metrics['n_cases']} casos.")
-    print(f"Metricas: {OUT_DIR / f'metricas_{args.split}.json'}")
+    print(f"Metricas: {out_dir / f'metricas_{args.split}.json'}")
     if "latency" in metrics:
         lat = metrics["latency"]
         print(f"Latencia (batch=1, {DEVICE}): media {lat['pipeline_ms_mean']:.1f} ms | "
@@ -1197,10 +1378,14 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
+    parser.add_argument("--plano", choices=(*PLANOS, "todos", "anterior"), default="todos",
+                        help="Modelo a evaluar: uno de los planos, los tres (todos) o el modelo axial anterior.")
+    parser.add_argument("--checkpoint", type=Path, default=None,
+                        help="Por defecto modelo_multitarea_{plano}.pt (o modelo_multitarea_final.pt con --plano anterior).")
     parser.add_argument("--split", choices=("val", "test"), default="test")
-    parser.add_argument("--cabeza", type=Path, default=DEFAULT_CABEZA,
-                        help="Pesos de la cabeza de pertenencia (etapa D); se verifica contra el tronco.")
+    parser.add_argument("--cabeza", type=Path, default=None,
+                        help="Pesos de la cabeza de pertenencia; por defecto cabeza_pertenencia_{plano}.pt "
+                             "(o cabeza_pertenencia.pt con --plano anterior). Se verifica contra el tronco.")
     parser.add_argument("--sam-checkpoint", type=Path)
     parser.add_argument("--sam-type", choices=("vit_b", "vit_l", "vit_h"), default="vit_b")
     parser.add_argument("--batch-size", type=int, default=8)
