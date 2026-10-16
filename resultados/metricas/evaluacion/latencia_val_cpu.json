@@ -1,0 +1,9 @@
+{
+  "device": "cpu",
+  "batch_size": 1,
+  "warmup_slices": 5,
+  "n_measured": 50,
+  "pipeline_ms_mean": 162.11947198957205,
+  "pipeline_ms_p50": 159.8971001803875,
+  "pipeline_ms_p95": 182.58501992095262
+}

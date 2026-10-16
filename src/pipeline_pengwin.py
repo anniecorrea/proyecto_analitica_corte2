@@ -106,6 +106,16 @@ def _poner_en_eval(componentes):
             m.eval()
 
 
+def mapa_compartido(componentes, images):
+    """Piramide del backbone con CBAM aplicado al ultimo nivel. Devuelve (feats, f4).
+    f4 es el mapa que comparten las tres cabezas: deteccion, decoder (via la piramide) y pertenencia."""
+    feats = list(componentes["features_fn"](componentes["backbone"], images))
+    if componentes.get("cbam") is not None:
+        refinado = componentes["cbam"](feats[-1])
+        feats[-1] = refinado[0] if isinstance(refinado, tuple) else refinado
+    return feats, feats[-1]
+
+
 # --------------------------------------------------------------------------------------------------
 # 1. Inferencia por lote de cortes
 # --------------------------------------------------------------------------------------------------
@@ -126,11 +136,7 @@ def inferir_cortes(componentes, images, cfg=None):
     if B == 0:
         return []
 
-    feats = list(componentes["features_fn"](componentes["backbone"], images))
-    if componentes.get("cbam") is not None:
-        refinado = componentes["cbam"](feats[-1])
-        feats[-1] = refinado[0] if isinstance(refinado, tuple) else refinado
-    f4 = feats[-1]
+    feats, f4 = mapa_compartido(componentes, images)
 
     det_out = componentes["det_head"](f4)
     raw = decode_predictions(det_out, score_thresh=cfg["score_thresh"])
@@ -260,11 +266,7 @@ def scores_por_corte(componentes, images, cfg=None):
     _poner_en_eval(componentes)
     if images.shape[0] == 0:
         return np.zeros(0, dtype=np.float32)
-    feats = list(componentes["features_fn"](componentes["backbone"], images))
-    f4 = feats[-1]
-    if componentes.get("cbam") is not None:
-        refinado = componentes["cbam"](f4)
-        f4 = refinado[0] if isinstance(refinado, tuple) else refinado
+    _, f4 = mapa_compartido(componentes, images)
     final = postprocess(componentes["det_head"](f4), score_thresh=cfg["score_thresh"], nms_fn=nms_por_clase,
                         iou_thresh=cfg["iou_thresh"], max_det_per_class=cfg["max_det_per_class"])
     return np.array([float(f["scores"].max()) if f["scores"].numel() else 0.0 for f in final], dtype=np.float32)
@@ -340,23 +342,26 @@ def _emparejar_instancias(gt_mask, pred_mask, iou_min=0.5):
 
 
 @torch.no_grad()
-def evaluar_pertenencia(componentes, images, targets, cfg=None, modo="pred", iou_min=0.5):
-    """Una fila por instancia REAL. modo='gt': la cabeza clasifica las máscaras reales (aísla la clasificación).
-    modo='pred': clasifica las instancias predichas emparejadas por IoU >= iou_min; las no emparejadas quedan
-    con clase 0 (no detectada) y cuentan como error, no se excluyen.
-    Columnas: case_id, slice_index, gt_id, clase_real, iou, prob_*, pred_cabeza, pred_semantica, pred_caja."""
+def probs_pertenencia_gt(componentes, images, targets):
+    """Probabilidades de la cabeza sobre las mascaras REALES (modo 'gt'). Lista de B dicts {gt_id: probs[3]}."""
+    _, f4 = mapa_compartido(componentes, images)
+    return clasificar_instancias(componentes["cls_head"], f4, [t["instance_mask"] for t in targets])
+
+
+def filas_pertenencia(res, targets, modo="pred", probs_gt=None, iou_min=0.5):
+    """Una fila por instancia REAL, a partir de salidas YA calculadas por inferir_cortes (no vuelve a inferir).
+    modo='gt': la cabeza clasifica las mascaras reales (requiere probs_gt de probs_pertenencia_gt): aisla la
+    clasificacion. modo='pred': clasifica las instancias predichas emparejadas por IoU >= iou_min; las no
+    emparejadas quedan con clase 0 (no detectada) y cuentan como error, no se excluyen.
+    Columnas: case_id, slice_index, gt_id, clase_real, iou, prob_*, pred_cabeza, pred_semantica, pred_caja,
+    area_gt_px (fragmento real), pred_id y area_pred_px (mascara que clasifico la cabeza; 0 si no hubo)."""
     from src.pertenencia import regla_caja_detectada, regla_mayoria_semantica
 
     if modo not in ("gt", "pred"):
         raise ValueError("modo debe ser 'gt' o 'pred'")
-    res = inferir_cortes(componentes, images, cfg)
+    if modo == "gt" and probs_gt is None:
+        raise ValueError("modo='gt' necesita probs_gt (ver probs_pertenencia_gt)")
     filas = []
-    if modo == "gt":
-        feats = list(componentes["features_fn"](componentes["backbone"], images))
-        if componentes.get("cbam") is not None:
-            r = componentes["cbam"](feats[-1])
-            feats[-1] = r[0] if isinstance(r, tuple) else r
-        probs_gt = clasificar_instancias(componentes["cls_head"], feats[-1], [t["instance_mask"] for t in targets])
     for b, (r, t) in enumerate(zip(res, targets)):
         gt_mask = np.asarray(t["instance_mask"].cpu() if torch.is_tensor(t["instance_mask"]) else t["instance_mask"])
         sem_rule = regla_mayoria_semantica(gt_mask if modo == "gt" else r["instance_mask"], r["semantic_mask"])
@@ -364,22 +369,39 @@ def evaluar_pertenencia(componentes, images, targets, cfg=None, modo="pred", iou
                                         r["final"]["boxes"], r["final"]["labels"])
         pares = None if modo == "gt" else _emparejar_instancias(gt_mask, r["instance_mask"], iou_min)
         probs_pred = {d["id"]: d["probs"] for d in r["instancias"]}
+        area_pred = {d["id"]: d["area_px"] for d in r["instancias"]}
         for gid in [int(v) for v in np.unique(gt_mask) if v != 0]:
+            area_gt = int((gt_mask == gid).sum())
             if modo == "gt":
                 key, iou, p = gid, 1.0, probs_gt[b].get(gid)
+                area_clasificada = area_gt
             else:
                 key, iou = pares.get(gid, (None, 0.0))
                 p = probs_pred.get(key) if key is not None else None
+                area_clasificada = area_pred.get(key, 0) if key is not None else 0
             fila = {"case_id": t.get("case_id"), "slice_index": t.get("slice_index"), "gt_id": gid,
                     "clase_real": clase_de_id(gid), "iou": iou,
                     "prob_sacro": np.nan, "prob_coxal_izquierdo": np.nan, "prob_coxal_derecho": np.nan,
-                    "pred_cabeza": 0, "pred_semantica": 0, "pred_caja": 0}
+                    "pred_cabeza": 0, "pred_semantica": 0, "pred_caja": 0,
+                    "area_gt_px": area_gt, "pred_id": 0 if (modo == "gt" or key is None) else int(key),
+                    "area_pred_px": int(area_clasificada)}
             if p is not None:
                 fila.update({"prob_sacro": p[0], "prob_coxal_izquierdo": p[1], "prob_coxal_derecho": p[2],
                              "pred_cabeza": int(np.argmax(p)) + 1,
                              "pred_semantica": sem_rule.get(key, 0), "pred_caja": box_rule.get(key, 0)})
             filas.append(fila)
     return pd.DataFrame(filas)
+
+
+@torch.no_grad()
+def evaluar_pertenencia(componentes, images, targets, cfg=None, modo="pred", iou_min=0.5):
+    """Corre el sistema (inferir_cortes) y devuelve la tabla por instancia REAL de filas_pertenencia.
+    Para evaluar un split completo sin inferir dos veces, ver src/evaluacion.py (usa filas_pertenencia)."""
+    if modo not in ("gt", "pred"):
+        raise ValueError("modo debe ser 'gt' o 'pred'")
+    res = inferir_cortes(componentes, images, cfg)
+    probs_gt = probs_pertenencia_gt(componentes, images, targets) if modo == "gt" else None
+    return filas_pertenencia(res, targets, modo, probs_gt, iou_min)
 
 
 def resumen_evaluacion_pertenencia(df):

@@ -149,8 +149,13 @@ Cuando la etapa `C_conjunto` haya terminado, exporta `modelo_multitarea_final.pt
 desde `notebooks/Entrenamiento_multitarea.ipynb` y ejecuta desde la raiz:
 
 ```bash
-python -m src.evaluacion --nms-function src.deteccion_grid:nms_por_clase --sam-checkpoint ruta\sam_vit_b.pth --device auto
+python -m src.evaluacion --sam-checkpoint ruta\sam_vit_b.pth --device auto
 ```
+
+La evaluacion corre el pipeline real del sistema (`src.pipeline_pengwin.inferir_cortes`): NMS por clase
+con `NMS_CONFIG`, decoder de instancias y cabeza de pertenencia. Necesita
+`resultados/modelos/nms_pertenencia/cabeza_pertenencia.pt` (y su `_meta.json`) entrenada sobre el MISMO
+checkpoint: si el tronco cambia, la evaluacion se detiene y pide reentrenar la etapa D.
 
 La comparacion con SAM corre solo sobre `test`, usando las cajas predichas como
 prompts. El checkpoint SAM es opcional; sin el, se evalua el modelo propio y el
