@@ -37,6 +37,7 @@ if str(ROOT) not in sys.path:
 from src.rutas import (CACHE_DIR, DATASET_CSV, DATOS_DIR, FIGURAS_DIR, MANIFEST_CSV, METRICAS_DIR,  # noqa: E402
                        MODELOS_DIR, NOTEBOOKS_DIR)
 from src.entrada_25d import in_channels_del_modelo  # noqa: E402
+from src.figuras_pertenencia import figura_confusion_pertenencia  # noqa: E402
 from src.deteccion_grid import NMS_CONFIG  # noqa: E402
 from src.pertenencia import NOMBRES, PertenenciaHead, metricas_pertenencia  # noqa: E402
 from src.pipeline_pengwin import (filas_pertenencia, inferir_cortes, probs_pertenencia_gt,  # noqa: E402
@@ -635,6 +636,8 @@ def _pertenencia_metrics(
     inst_df: pd.DataFrame,
     out_dir: Path,
     split: str,
+    fig_dir: Path | None = None,
+    nombre_modelo: str = "",
 ) -> tuple[dict[str, Any], pd.DataFrame, pd.DataFrame]:
     """Clasificacion por pertenencia del SISTEMA. Unidad: cada fragmento real en cada corte.
 
@@ -687,9 +690,18 @@ def _pertenencia_metrics(
     }
 
     nombres = ["sin_clase", *(NOMBRES[c] for c in CLASS_IDS)]
-    if "matriz_confusion" in m:
-        pd.DataFrame(m["matriz_confusion"], index=[f"real_{n}" for n in nombres],
-                     columns=[f"pred_{n}" for n in nombres]).to_csv(out_dir / f"pertenencia_confusion_{split}.csv")
+    # Matrices de confusion (fila/columna 0 = sin clase): sistema completo y mascaras reales, en CSV y en figura.
+    for sufijo, resultado in (("", m), ("_mascaras_reales", m_gt)):
+        if "matriz_confusion" in resultado:
+            pd.DataFrame(resultado["matriz_confusion"], index=[f"real_{n}" for n in nombres],
+                         columns=[f"pred_{n}" for n in nombres]).to_csv(
+                out_dir / f"pertenencia_confusion{sufijo}_{split}.csv")
+    if fig_dir is not None and "matriz_confusion" in m and "matriz_confusion" in m_gt:
+        figura_confusion_pertenencia(
+            m["matriz_confusion"], m_gt["matriz_confusion"], fig_dir / f"pertenencia_confusion_{split}.png",
+            titulo=f"Pertenencia anatomica en {split}" + (f" ({nombre_modelo})" if nombre_modelo else ""),
+            f1_sistema=m["f1_macro"], f1_mascaras=m_gt["f1_macro"],
+        )
     por_tamano = _pertenencia_por_tamano(pred_df, gt_df, inst_df)
     resumen.to_csv(out_dir / f"pertenencia_resumen_{split}.csv", index=False)
     por_tamano.to_csv(out_dir / f"pertenencia_por_tamano_{split}.csv", index=False)
@@ -1297,6 +1309,8 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
         pd.DataFrame(instance_rows),
         out_dir,
         args.split,
+        fig_dir=fig_dir,
+        nombre_modelo=f"modelo {args.plano}" if args.plano else "modelo anterior",
     )
     metrics.update(pertenencia)
     metrics.update(_detection_metrics(all_detections, all_targets))

@@ -1,11 +1,12 @@
 {
   "split": "val",
+  "plano": "axial (modelo anterior)",
   "checkpoint": "resultados/modelos/entrenamiento_multitarea/modelo_multitarea_final.pt",
   "checkpoint_stage": "C_conjunto",
   "device": "cpu",
   "n_slices": 1265,
   "n_cases": 5,
-  "mean_inference_ms_per_slice_batched": 210.28228506055686,
+  "mean_inference_ms_per_slice_batched": 200.6011256916939,
   "cls_threshold": 0.5,
   "pipeline": "src.pipeline_pengwin:inferir_cortes",
   "score_thresh": 0.05,
@@ -80,14 +81,5 @@
       "minimum": 0.7,
       "met": false
     }
-  },
-  "latency": {
-    "device": "cpu",
-    "batch_size": 1,
-    "warmup_slices": 5,
-    "n_measured": 50,
-    "pipeline_ms_mean": 162.11947198957205,
-    "pipeline_ms_p50": 159.8971001803875,
-    "pipeline_ms_p95": 182.58501992095262
   }
 }
