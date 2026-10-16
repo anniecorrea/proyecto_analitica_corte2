@@ -1,7 +1,57 @@
-# Proyecto PENGWIN
+# Proyecto PENGWIN: fracturas pélvicas en tomografia
 
-Sistema academico para deteccion, segmentacion, clasificacion y medicion de
-fracturas pelvicas a partir de tomografia computarizada.
+Este repositorio contiene un sistema académico que analiza tomografías computarizadas de pelvis con fractura, tomadas del dataset PENGWIN. Para cada estudio, el sistema:
+
+1. **Detección:** De tres regiones oseas de la pelvis (sacro, coxal izquierdo y coxal derecho) con una cabeza de detección propiaa basada en una grid y un NMS implementado por nosotros.
+
+2. **Segmentación:** Cada fragmento oseo se clasifica según el hueso al que pertenece con un color caracteristico para cada una de las regiones.
+
+3. **Muestras:** los resultados se presentan en un dashboard de Streamlit con 3 visualizadores: el volumen crudo, laa inferencia entre los cortes y la reconstrucción 3D.
+
+**Aviso:** Proyecto con fines exclusivamente académicos. No es un dispositivo médico, no está validado clínicamente y no debe usarse para apoyar decisiones quirúrgicas reales.
+
+# Dataset
+
+Se usa la parte del CT del challenge de PENGWIN (MICCAI 2024). Son 100 tomografias de pelvis con fracturas y sus mascaras de fragmentos, anotada y validadas por ortopedistas. Los datos no se encuentran en el repositorio, ya que estos pesan varias GB, deberas de descargar el dataset en: [PENGWIN](https://zenodo.org/records/10927452) y crear la carpeta data_mha/ en la rama main del repositorio.
+
+# Instalación
+
+Requisitos:
+
+- Python
+- Git y Git LFS
+
+**Recomendación:** Tener GPU disponible para entrenar el modelo.
+
+1. **Clonar y descargar los pesos**
+
+´´
+git clone https://github.com/anniecorrea/proyecto_analitica_corte2.git
+cd proyecto_analitica_corte2
+git lfs install
+git lfs pull
+
+2. **Crear el ambiente virtual**
+
+**Windows**
+´´
+python -3.13 -m venv .venv
+.venv\Scripts\Activate.ps1
+´´
+
+**MacOs / Linux**
+´´
+python3.13 -m venv .venv
+source .venv/bin/activate
+´´
+
+3. **Instalar dependencias**
+
+´´
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install --no-cache-dir -r requirements.txt
+´´
+
 
 ## Regla de organizacion
 
