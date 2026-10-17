@@ -261,8 +261,16 @@ Evalua los tres modelos por plano que exporta `notebooks/Entrenamiento_multitare
 (`modelo_multitarea_{axial,coronal,sagital}.pt`). Desde la raiz:
 
 ```bash
-python -m src.evaluacion --plano todos --split val --nms-function src.deteccion_grid:nms_por_clase --device auto
+python -m src.evaluacion --plano todos --split val --device auto
 ```
+
+La evaluacion corre el pipeline real del sistema (`src.pipeline_pengwin.inferir_cortes`): NMS por clase con
+`NMS_CONFIG`, decoder de instancias y cabeza de pertenencia. Cada modelo necesita su cabeza en
+`resultados/modelos/nms_pertenencia/cabeza_pertenencia_{plano}.pt` (`cabeza_pertenencia.pt` para `--plano anterior`),
+con su `_meta.json`, entrenada sobre ESE checkpoint: si el tronco no coincide, la evaluacion se detiene y pide
+reentrenar la etapa D. Las cabezas por plano se entrenan con `python -m src.entrenar_pertenencia_planos --plano todos
+--device cuda` (tronco congelado, ~1 min por plano en GPU). La clasificacion por pertenencia se mide por fragmento real (los no emparejados con IoU >= 0.5
+cuentan como error) y se reporta junto con la cobertura, el modo con mascaras reales y las reglas base.
 
 Cada modelo se evalua con los mismos datos y el mismo codigo de su entrenamiento: las clases de dataset, la cache de
 cortes y `MultiTaskNet` se cargan del cuaderno de planos, y en `val` se reutiliza la cache que construyo el
@@ -278,8 +286,8 @@ La comparacion con SAM (`--sam-checkpoint ruta\sam_vit_b.pth`) corre solo sobre 
 como prompts. Usa `--device cpu` o `--device cuda` para medir cada escenario por separado.
 El manifiesto actual contiene cortes positivos, por lo que los resultados se
 interpretan sobre esos cortes y no sobre cortes vacios del volumen.
-F1/AUC miden presencia de cada region por corte; Dice/IoU del modelo se calculan
-por fragmento con emparejamiento uno-a-uno dentro de su region. La comparacion
+La pertenencia (F1/AUC) se mide por fragmento real; la presencia de region por corte queda como diagnostico.
+Dice/IoU del modelo se calculan por fragmento con emparejamiento uno-a-uno dentro de su region (clase de la cabeza). La comparacion
 SAM se reporta por region, usando las mismas cajas predichas como prompts.
 
 ## Resultados actuales

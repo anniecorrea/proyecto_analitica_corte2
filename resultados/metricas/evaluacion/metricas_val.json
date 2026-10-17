@@ -1,0 +1,85 @@
+{
+  "split": "val",
+  "plano": "axial (modelo anterior)",
+  "checkpoint": "resultados/modelos/entrenamiento_multitarea/modelo_multitarea_final.pt",
+  "checkpoint_stage": "C_conjunto",
+  "device": "cpu",
+  "n_slices": 1265,
+  "n_cases": 5,
+  "mean_inference_ms_per_slice_batched": 200.6011256916939,
+  "cls_threshold": 0.5,
+  "pipeline": "src.pipeline_pengwin:inferir_cortes",
+  "score_thresh": 0.05,
+  "nms_iou": 0.5,
+  "max_det_per_class": 1,
+  "umbral_corte": null,
+  "cabeza_pertenencia": "resultados/modelos/nms_pertenencia/cabeza_pertenencia.pt",
+  "cabeza_tronco_sha256_16": "d1d067a46e95486c",
+  "evaluated_slices_note": "solo cortes positivos del manifiesto (con al menos una region GT)",
+  "n_ground_truth_fragments": 3945,
+  "modelo_fragment_dice": 0.7455910308994799,
+  "modelo_fragment_iou": 0.6623817047761802,
+  "nms_function": "src.deteccion_grid:nms_por_clase",
+  "sam": "not_requested",
+  "presencia_region_f1_macro": 0.9268552232394672,
+  "presencia_region_f1_micro": 0.9320858202935958,
+  "presencia_region_auc_macro": 0.947106442588599,
+  "pertenencia_n_fragmentos": 3945,
+  "pertenencia_cobertura": 0.7832699619771863,
+  "pertenencia_f1_macro": 0.8349404890000248,
+  "pertenencia_exactitud": 0.7493029150823828,
+  "pertenencia_f1_sacro": 0.7866884888161484,
+  "pertenencia_f1_coxal_izquierdo": 0.8644255633542667,
+  "pertenencia_f1_coxal_derecho": 0.8537074148296593,
+  "pertenencia_auc_macro_ovr": 0.9966454297170771,
+  "pertenencia_gt_f1_macro": 0.9448408810827278,
+  "pertenencia_gt_exactitud": 0.9452471482889734,
+  "pertenencia_gt_auc_macro_ovr": 0.9934546008809315,
+  "regla_semantica_f1_macro": 0.8703256638621321,
+  "regla_caja_f1_macro": 0.8606814384050149,
+  "regla_semantica_gt_f1_macro": 0.9717742646126656,
+  "n_instancias_predichas": 7828,
+  "conflictos_cabeza_decoder": 1102,
+  "conflictos_frac": 0.1407766990291262,
+  "conflictos_emparejados": 132,
+  "conflictos_acierta_cabeza": 0.007575757575757576,
+  "conflictos_acierta_decoder": 0.9924242424242424,
+  "bbox_mean_iou": 0.802480493488825,
+  "bbox_mean_iou_best_candidate": 0.802480493488825,
+  "bbox_map50": 0.8823303475685522,
+  "bbox_map50_95": 0.615009974015757,
+  "modelo_dice_macro": 0.9138465754185995,
+  "modelo_iou_macro": 0.8420001364481428,
+  "decoder_dice_macro": 0.9443033676171654,
+  "decoder_iou_macro": 0.8951534275549786,
+  "targets": {
+    "pertenencia_f1_macro": {
+      "minimum": 0.85,
+      "met": false
+    },
+    "pertenencia_auc_macro_ovr": {
+      "minimum": 0.85,
+      "met": true
+    },
+    "bbox_mean_iou": {
+      "minimum": 0.65,
+      "met": true
+    },
+    "bbox_map50": {
+      "minimum": 0.65,
+      "met": true
+    },
+    "bbox_map50_95": {
+      "minimum": 0.4,
+      "met": true
+    },
+    "modelo_fragment_dice": {
+      "minimum": 0.85,
+      "met": false
+    },
+    "modelo_fragment_iou": {
+      "minimum": 0.7,
+      "met": false
+    }
+  }
+}

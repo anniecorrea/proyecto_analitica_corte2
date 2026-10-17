@@ -1,0 +1,20 @@
+{
+  "plano": "coronal",
+  "tronco": "modelo_multitarea_coronal.pt",
+  "tronco_sha256_16": "3a0ffc5c0f286f10",
+  "mejor_epoca": 11,
+  "val_f1_macro": 0.9756807130645656,
+  "val_auc_macro_ovr": 0.9989015256071099,
+  "nota_val": "F1/AUC con mascaras REALES (teacher forcing); el F1 del sistema completo lo da src/evaluacion.py",
+  "cortes_train": 3000,
+  "cortes_val": 987,
+  "instancias_train": 10042,
+  "instancias_val": 3109,
+  "linea_media_sagital": null,
+  "epochs_max": 40,
+  "lr": 0.001,
+  "paciencia": 8,
+  "seed": 42,
+  "device": "cuda",
+  "minutos": 1.3
+}

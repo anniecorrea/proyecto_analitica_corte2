@@ -37,6 +37,11 @@ if str(ROOT) not in sys.path:
 from src.rutas import (CACHE_DIR, DATASET_CSV, DATOS_DIR, FIGURAS_DIR, MANIFEST_CSV, METRICAS_DIR,  # noqa: E402
                        MODELOS_DIR, NOTEBOOKS_DIR)
 from src.entrada_25d import in_channels_del_modelo  # noqa: E402
+from src.figuras_pertenencia import figura_confusion_pertenencia  # noqa: E402
+from src.deteccion_grid import NMS_CONFIG  # noqa: E402
+from src.pertenencia import NOMBRES, PertenenciaHead, metricas_pertenencia  # noqa: E402
+from src.pipeline_pengwin import (filas_pertenencia, inferir_cortes, probs_pertenencia_gt,  # noqa: E402
+                                  resumen_evaluacion_pertenencia)
 
 BASE_DIR = ROOT
 IMAGE_SIZE = 256
@@ -58,9 +63,23 @@ def checkpoint_del_plano(plano: str) -> Path:
     return MODELOS_DIR / f"entrenamiento_multitarea_{plano}" / f"modelo_multitarea_{plano}.pt"
 
 
+CABEZAS_DIR = MODELOS_DIR / "nms_pertenencia"   # cabezas de pertenencia (etapa D, Fabian)
+NMS_REFERENCIA = "src.deteccion_grid:nms_por_clase"   # el NMS que usa el sistema (via pipeline_pengwin)
+
+
+def cabeza_del_plano(plano: str | None) -> Path:
+    """Cabeza de pertenencia entrenada (etapa D) sobre el tronco de ese plano; None = modelo anterior."""
+    return CABEZAS_DIR / ("cabeza_pertenencia.pt" if plano is None else f"cabeza_pertenencia_{plano}.pt")
+
+
 CLASS_IDS = (1, 2, 3)
 N_WORST_EXAMPLES = 5   # el informe pide una galeria de los cinco peores casos
 N_BEST_EXAMPLES = 3
+IOU_PERTENENCIA = 0.5   # IoU minimo para emparejar un fragmento real con una instancia predicha
+# Tamanos de fragmento en pixeles de la imagen 256 x 256 (para ver donde falla la pertenencia)
+BINS_AREA = (0, 100, 400, 1600, np.inf)
+ETIQUETAS_AREA = ("<100 px", "100-399 px", "400-1599 px", ">=1600 px")
+PROB_COLS = ["prob_sacro", "prob_coxal_izquierdo", "prob_coxal_derecho"]
 REGION_COLORS = {
     1: np.array([0.95, 0.60, 0.10], dtype=np.float32),
     2: np.array([0.20, 0.45, 0.95], dtype=np.float32),
@@ -316,17 +335,6 @@ def _verify_class_convention() -> None:
             )
 
 
-def _load_callable(specification: str) -> Callable[..., Any]:
-    module_name, separator, attribute = specification.partition(":")
-    if not separator or not module_name or not attribute:
-        raise ValueError("El NMS debe indicarse como 'modulo:funcion'.")
-    module = importlib.import_module(module_name)
-    candidate = getattr(module, attribute, None)
-    if not callable(candidate):
-        raise TypeError(f"{specification!r} no identifica una funcion NMS invocable.")
-    return candidate
-
-
 def _load_sam(checkpoint: Path, model_type: str, device: torch.device) -> Any:
     try:
         segment_anything = importlib.import_module("segment_anything")
@@ -395,6 +403,70 @@ def _load_model(checkpoint: Path, device: torch.device) -> tuple[nn.Module, dict
     model.load_state_dict(payload["model_state_dict"])
     model.eval()
     return model, payload
+
+
+def _load_cabeza_pertenencia(
+    path: Path, checkpoint: Path, device: torch.device
+) -> tuple[nn.Module, dict[str, Any]]:
+    """Carga la cabeza de pertenencia (etapa D) y verifica que se entreno sobre ESTE tronco.
+
+    La cabeza aprende sobre el f4 de un checkpoint concreto. Si el tronco cambia (otro plano, otra arquitectura u
+    otro entrenamiento), los pesos de la cabeza ya no significan lo mismo aunque las formas coincidan: cargaria
+    sin error y daria metricas falsas. Por eso se compara el sha256 guardado en el meta.
+    """
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"No existe la cabeza de pertenencia {path.name}. Entrenala sobre {checkpoint.name} "
+            "(etapa D en nms_pertenencia_pipeline.ipynb) antes de evaluar este modelo."
+        )
+    meta_path = path.with_name(f"{path.stem}_meta.json")
+    if not meta_path.is_file():
+        raise FileNotFoundError(f"Falta {meta_path.name}: sin el no se puede verificar el tronco.")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    tronco_actual = hashlib.sha256(checkpoint.read_bytes()).hexdigest()[:16]
+    if meta.get("tronco_sha256_16") != tronco_actual:
+        raise ValueError(
+            f"La cabeza {path.name} se entreno sobre otro tronco "
+            f"(meta: {meta.get('tronco_sha256_16')!r}, {checkpoint.name}: {tronco_actual!r}). "
+            "Reentrenala (etapa D en nms_pertenencia_pipeline.ipynb) antes de evaluar."
+        )
+    head = PertenenciaHead().to(device)
+    head.load_state_dict(torch.load(path, map_location=device, weights_only=True))
+    head.eval()
+    return head, meta
+
+
+class _DecoderDelSistema(nn.Module):
+    """Adaptador entre MultiTaskNet y pipeline_pengwin.inferir_cortes.
+
+    inferir_cortes llama seg_decoder(imagen, piramide, priors, output_size). Los modelos por plano pueden recibir un
+    canal de posicion extra (sagital) que el decoder NO debe ver: se recorta igual que hace MultiTaskNet.segment.
+    El modelo anterior no tiene image_channels y recibe la imagen completa.
+    """
+    def __init__(self, model: nn.Module):
+        super().__init__()
+        self.model = model
+
+    def forward(self, image, features, region_priors, output_size=(IMAGE_SIZE, IMAGE_SIZE)):
+        canales = getattr(self.model, "image_channels", image.shape[1])
+        return self.model.seg_decoder(image[:, :canales], features, region_priors, output_size=output_size)
+
+
+def _build_componentes(model: nn.Module, cls_head: nn.Module) -> dict[str, Any]:
+    """Traduce el MultiTaskNet entrenado al diccionario que espera pipeline_pengwin.inferir_cortes.
+
+    features_fn + cbam reproducen exactamente model.trunk(): piramide del backbone y CBAM solo sobre f4.
+    """
+    return {
+        "backbone": model.backbone,
+        "cbam": model.cbam,
+        "det_head": model.det_head,
+        "seg_decoder": _DecoderDelSistema(model),
+        "cls_head": cls_head,
+        "features_fn": _COMPONENTS["backbone_feature_pyramid"],
+        "priors_fn": _COMPONENTS["build_detection_region_priors"],
+        "decode_fn": _COMPONENTS["decode_center_offset_instances"],
+    }
 
 
 def _box_iou(box: np.ndarray, boxes: np.ndarray) -> np.ndarray:
@@ -520,11 +592,123 @@ def _classification_metrics(
         for index in range(len(CLASS_IDS))
         if np.unique(y_true[:, index]).size == 2
     ]
+    # OJO: esto NO es la pertenencia. Mide, por corte, si el DETECTOR dice que cada region esta presente.
     return {
-        "classification_f1_macro": float(f1_macro),
-        "classification_f1_micro": float(f1_micro),
-        "classification_auc_macro": float(np.mean(aucs)) if aucs else math.nan,
+        "presencia_region_f1_macro": float(f1_macro),
+        "presencia_region_f1_micro": float(f1_micro),
+        "presencia_region_auc_macro": float(np.mean(aucs)) if aucs else math.nan,
     }
+
+
+def _pertenencia_por_tamano(
+    pred_df: pd.DataFrame, gt_df: pd.DataFrame, inst_df: pd.DataFrame
+) -> pd.DataFrame:
+    """Desempeno de la pertenencia segun el tamano del fragmento.
+
+    Hipotesis a probar: la cabeza se entreno con mascaras REALES y en el sistema recibe instancias predichas,
+    muchas pequenas; con pocos pixeles el promedio de f4 trae poca informacion y la cabeza falla mas.
+    """
+    def con_tamano(df: pd.DataFrame, columna: str) -> pd.DataFrame:
+        return df.assign(tamano=pd.cut(df[columna], BINS_AREA, right=False, labels=ETIQUETAS_AREA))
+
+    pred, gt, inst = con_tamano(pred_df, "area_gt_px"), con_tamano(gt_df, "area_gt_px"), con_tamano(inst_df, "area_px")
+    filas = []
+    for etiqueta in ETIQUETAS_AREA:
+        p, g, i = pred[pred.tamano == etiqueta], gt[gt.tamano == etiqueta], inst[inst.tamano == etiqueta]
+        emp = p[p.pred_cabeza > 0]
+        filas.append({
+            "tamano_fragmento": etiqueta,
+            "n_fragmentos_reales": len(p),
+            "cobertura": (p.pred_cabeza > 0).mean() if len(p) else math.nan,
+            "exactitud_cabeza_mascara_real": (g.pred_cabeza == g.clase_real).mean() if len(g) else math.nan,
+            "exactitud_cabeza_emparejados": (emp.pred_cabeza == emp.clase_real).mean() if len(emp) else math.nan,
+            "exactitud_decoder_emparejados": (emp.pred_semantica == emp.clase_real).mean() if len(emp) else math.nan,
+            "n_instancias_predichas": len(i),
+            "frac_instancias_sin_emparejar": (i.clase_real == 0).mean() if len(i) else math.nan,
+            "frac_conflicto_cabeza_decoder": i.conflicto.mean() if len(i) else math.nan,
+        })
+    return pd.DataFrame(filas)
+
+
+def _pertenencia_metrics(
+    pred_df: pd.DataFrame,
+    gt_df: pd.DataFrame,
+    inst_df: pd.DataFrame,
+    out_dir: Path,
+    split: str,
+    fig_dir: Path | None = None,
+    nombre_modelo: str = "",
+) -> tuple[dict[str, Any], pd.DataFrame, pd.DataFrame]:
+    """Clasificacion por pertenencia del SISTEMA. Unidad: cada fragmento real en cada corte.
+
+    - F1 y exactitud con instancias predichas: un fragmento sin instancia emparejada (IoU < 0.5) cuenta como
+      ERROR (clase 0). Asi el F1 tambien castiga la segmentacion, que es lo que vive el usuario.
+    - AUC: solo existe donde la cabeza dio probabilidades (fragmentos emparejados). Se reporta junto con la
+      cobertura; un AUC alto con cobertura baja no significa que el sistema clasifique bien.
+    - Modo 'gt' (mascaras reales): aisla el error de clasificacion del error de segmentacion.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    m = metricas_pertenencia(pred_df["clase_real"].to_numpy(), y_pred=pred_df["pred_cabeza"].to_numpy())
+    emparejados = pred_df.dropna(subset=PROB_COLS)
+    auc = metricas_pertenencia(
+        emparejados["clase_real"].to_numpy(), probs=emparejados[PROB_COLS].to_numpy()
+    )["auc_macro_ovr"]
+    m_gt = metricas_pertenencia(gt_df["clase_real"].to_numpy(), probs=gt_df[PROB_COLS].to_numpy())
+
+    resumen = pd.concat([
+        resumen_evaluacion_pertenencia(pred_df).assign(modo="instancias_predichas"),
+        resumen_evaluacion_pertenencia(gt_df).assign(modo="mascaras_reales"),
+    ], ignore_index=True)
+    resumen.insert(0, "modo", resumen.pop("modo"))
+    por_metodo = resumen.set_index(["modo", "metodo"])["f1_macro"]
+
+    conflictos = inst_df[inst_df.conflicto]
+    conflictos_emp = conflictos[conflictos.clase_real > 0]
+    metricas = {
+        "pertenencia_n_fragmentos": int(m["n"]),
+        "pertenencia_cobertura": len(emparejados) / len(pred_df) if len(pred_df) else math.nan,
+        "pertenencia_f1_macro": m["f1_macro"],
+        "pertenencia_exactitud": m["exactitud"],
+        **{f"pertenencia_f1_{NOMBRES[c]}": m.get(f"f1_{NOMBRES[c]}", math.nan) for c in CLASS_IDS},
+        "pertenencia_auc_macro_ovr": auc,
+        "pertenencia_gt_f1_macro": m_gt["f1_macro"],
+        "pertenencia_gt_exactitud": m_gt["exactitud"],
+        "pertenencia_gt_auc_macro_ovr": m_gt["auc_macro_ovr"],
+        "regla_semantica_f1_macro": float(por_metodo[("instancias_predichas", "regla_mayoria_semantica")]),
+        "regla_caja_f1_macro": float(por_metodo[("instancias_predichas", "regla_caja_detectada")]),
+        "regla_semantica_gt_f1_macro": float(por_metodo[("mascaras_reales", "regla_mayoria_semantica")]),
+        "n_instancias_predichas": int(len(inst_df)),
+        "conflictos_cabeza_decoder": int(len(conflictos)),
+        "conflictos_frac": len(conflictos) / len(inst_df) if len(inst_df) else math.nan,
+        "conflictos_emparejados": int(len(conflictos_emp)),
+        "conflictos_acierta_cabeza": (
+            float((conflictos_emp.clase_cabeza == conflictos_emp.clase_real).mean()) if len(conflictos_emp) else math.nan
+        ),
+        "conflictos_acierta_decoder": (
+            float((conflictos_emp.clase_decoder == conflictos_emp.clase_real).mean()) if len(conflictos_emp) else math.nan
+        ),
+    }
+
+    nombres = ["sin_clase", *(NOMBRES[c] for c in CLASS_IDS)]
+    # Matrices de confusion (fila/columna 0 = sin clase): sistema completo y mascaras reales, en CSV y en figura.
+    for sufijo, resultado in (("", m), ("_mascaras_reales", m_gt)):
+        if "matriz_confusion" in resultado:
+            pd.DataFrame(resultado["matriz_confusion"], index=[f"real_{n}" for n in nombres],
+                         columns=[f"pred_{n}" for n in nombres]).to_csv(
+                out_dir / f"pertenencia_confusion{sufijo}_{split}.csv")
+    if fig_dir is not None and "matriz_confusion" in m and "matriz_confusion" in m_gt:
+        figura_confusion_pertenencia(
+            m["matriz_confusion"], m_gt["matriz_confusion"], fig_dir / f"pertenencia_confusion_{split}.png",
+            titulo=f"Pertenencia anatomica en {split}" + (f" ({nombre_modelo})" if nombre_modelo else ""),
+            f1_sistema=m["f1_macro"], f1_mascaras=m_gt["f1_macro"],
+        )
+    por_tamano = _pertenencia_por_tamano(pred_df, gt_df, inst_df)
+    resumen.to_csv(out_dir / f"pertenencia_resumen_{split}.csv", index=False)
+    por_tamano.to_csv(out_dir / f"pertenencia_por_tamano_{split}.csv", index=False)
+    pred_df.to_csv(out_dir / f"pertenencia_detalle_{split}_pred.csv", index=False)
+    gt_df.to_csv(out_dir / f"pertenencia_detalle_{split}_gt.csv", index=False)
+    inst_df.to_csv(out_dir / f"instancias_{split}.csv", index=False)
+    return metricas, resumen, por_tamano
 
 
 def _semantic_metrics(
@@ -666,73 +850,34 @@ def _save_example(
 
 
 def _run_pipeline(
-    model: nn.Module,
+    componentes: dict[str, Any],
     images: torch.Tensor,
-    nms_fn: Callable[..., Any],
-    args: argparse.Namespace,
-    params: dict[str, Any],
-):
-    """Inferencia completa de un lote: deteccion -> NMS -> segmentacion -> instancias.
+    cfg: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Inferencia de un lote con el pipeline REAL del sistema (pipeline_pengwin.inferir_cortes):
+    tronco -> cabeza grid -> NMS por clase (con su tope por clase) -> priors -> decoder -> instancias
+    -> cabeza de pertenencia.
 
-    Es la UNICA definicion del pipeline: la usan tanto la evaluacion como la medicion de latencia,
-    para que ambas midan exactamente lo mismo.
+    La evaluacion y la latencia miden exactamente lo que entrega el sistema; si el pipeline cambia, la
+    evaluacion cambia con el.
     """
-    center_threshold = params["center_threshold"]
-    min_center_distance = params["min_center_distance"]
-    min_instance_pixels = params["min_instance_pixels"]
-    pred_box_score_min = params["pred_box_score_min"]
-    with torch.inference_mode():
-        features = model.trunk(images)
-        logits = model.det_head(features[-1])
-        detections = _COMPONENTS["postprocess"](
-            logits.float(),
-            score_thresh=args.score_threshold,
-            nms_fn=nms_fn,
-            iou_thresh=args.nms_iou,
-        )
-        segmentation_detections = []
-        for detection in detections:
-            keep = detection["scores"] >= pred_box_score_min
-            segmentation_detections.append({
-                key: value[keep] if key in {"boxes", "scores", "labels", "cells"} else value
-                for key, value in detection.items()
-            })
-        priors = _COMPONENTS["build_detection_region_priors"](
-            segmentation_detections,
-            output_size=(IMAGE_SIZE, IMAGE_SIZE),
-            device=DEVICE,
-        )
-        if hasattr(model, "segment"):   # MultiTaskNet por plano: quita el canal de posicion antes del decoder
-            segmentation = model.segment(images, features, priors)
-        else:
-            segmentation = model.seg_decoder(images, features, priors)
-        semantic_predictions = segmentation["semantic_logits"].float().argmax(1).cpu().numpy()
-        instance_predictions = [
-            _COMPONENTS["decode_center_offset_instances"](
-                {key: value[index:index + 1].float() for key, value in segmentation.items()},
-                center_threshold=center_threshold,
-                min_center_distance=min_center_distance,
-                min_instance_pixels=min_instance_pixels,
-            )
-            for index in range(len(detections))
-        ]
-    return detections, segmentation_detections, semantic_predictions, instance_predictions
+    return inferir_cortes(componentes, images, cfg)
 
 
 def _measure_latency(
-    model: nn.Module,
+    componentes: dict[str, Any],
     dataset: Any,
-    nms_fn: Callable[..., Any],
     args: argparse.Namespace,
-    params: dict[str, Any],
+    cfg: dict[str, Any],
     sam_predictor: Any,
     warmup: int = 5,
     image_channels: int | None = None,
 ) -> dict[str, Any]:
     """Latencia por imagen (batch=1), extremo a extremo y despues de calentar.
 
-    Incluye tronco + cabeza de deteccion + NMS + segmentacion + decodificacion de instancias.
-    No incluye lectura de disco ni la distancia de separacion. SAM se mide aparte (set_image + predict).
+    Incluye tronco + cabeza de deteccion + NMS + segmentacion + decodificacion de instancias + cabeza de
+    pertenencia (todo inferir_cortes). No incluye lectura de disco ni la distancia de separacion.
+    SAM se mide aparte (set_image + predict).
     """
     collate = _COMPONENTS["collate_slices"]
     total = min(args.latency_runs + warmup, len(dataset))
@@ -749,13 +894,13 @@ def _measure_latency(
         images = batch["image"].to(DEVICE)
         _sync()
         start = time.perf_counter()
-        _, segmentation_detections, _, _ = _run_pipeline(model, images, nms_fn, args, params)
+        salidas = _run_pipeline(componentes, images, cfg)
         _sync()
         elapsed = (time.perf_counter() - start) * 1000
         sam_elapsed = None
         if sam_predictor is not None:
             start = time.perf_counter()
-            _sam_semantic(sam_predictor, batch["image"][0, :image_channels].numpy(), segmentation_detections[0])
+            _sam_semantic(sam_predictor, batch["image"][0, :image_channels].numpy(), salidas[0]["final"])
             _sync()
             sam_elapsed = (time.perf_counter() - start) * 1000
         if index >= warmup:
@@ -810,8 +955,12 @@ def _keep_ranked(store: list, example: tuple, k: int, largest: bool) -> None:
 def _write_comparison_table(metrics: dict[str, Any], out_dir: Path, split: str) -> pd.DataFrame:
     """Tabla comparativa metrica | objetivo | modelo | SAM | cumple (CSV y Markdown)."""
     spec = [
-        ("Clasificacion F1 macro", "classification_f1_macro", None, 0.85),
-        ("Clasificacion AUC macro", "classification_auc_macro", None, 0.85),
+        ("Pertenencia F1 macro (sistema completo)", "pertenencia_f1_macro", None, 0.85),
+        ("Pertenencia AUC macro OvR (fragmentos emparejados)", "pertenencia_auc_macro_ovr", None, 0.85),
+        ("Cobertura de fragmentos (IoU >= 0.5)", "pertenencia_cobertura", None, None),
+        ("Pertenencia F1 con mascaras reales (diagnostico)", "pertenencia_gt_f1_macro", None, None),
+        ("Regla semantica F1 (baseline, sistema completo)", "regla_semantica_f1_macro", None, None),
+        ("Presencia de region F1 (detector, diagnostico)", "presencia_region_f1_macro", None, None),
         ("Deteccion IoU promedio", "bbox_mean_iou", None, 0.65),
         ("Deteccion mAP@0.50", "bbox_map50", None, 0.65),
         ("Deteccion mAP@[0.50:0.95]", "bbox_map50_95", None, 0.40),
@@ -819,6 +968,7 @@ def _write_comparison_table(metrics: dict[str, Any], out_dir: Path, split: str) 
         ("Segmentacion IoU por fragmento", "modelo_fragment_iou", None, 0.70),
         ("Dice semantico macro (modelo vs SAM)", "modelo_dice_macro", "sam_dice_macro", None),
         ("IoU semantico macro (modelo vs SAM)", "modelo_iou_macro", "sam_iou_macro", None),
+        ("Dice semantico macro del decoder (diagnostico)", "decoder_dice_macro", None, None),
     ]
 
     def fmt(value: Any) -> str:
@@ -851,14 +1001,16 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
     """--plano todos: evalua los tres modelos por plano y escribe el resumen; --plano X: uno; --plano anterior: el
     modelo axial anterior (modelo_multitarea_final.pt) como antes."""
     planos_pedidos = list(PLANOS) if args.plano == "todos" else [args.plano]
-    if args.checkpoint is not None and len(planos_pedidos) > 1:
-        raise ValueError("--checkpoint solo se puede usar con un plano (--plano axial|coronal|sagital|anterior).")
+    if (args.checkpoint is not None or args.cabeza is not None) and len(planos_pedidos) > 1:
+        raise ValueError("--checkpoint y --cabeza solo se pueden usar con un plano (--plano axial|coronal|sagital|anterior).")
     resultados = {}
     for plano in planos_pedidos:
         sub = argparse.Namespace(**vars(args))
         sub.plano = None if plano == "anterior" else plano
         if sub.checkpoint is None:
             sub.checkpoint = DEFAULT_CHECKPOINT if plano == "anterior" else checkpoint_del_plano(plano)
+        if sub.cabeza is None:
+            sub.cabeza = cabeza_del_plano(sub.plano)
         print(f"\n===== Modelo {plano} ({sub.checkpoint.name}) | split={args.split} =====", flush=True)
         resultados[plano] = _evaluate_model(sub)
         gc.collect()
@@ -879,6 +1031,8 @@ def _write_plane_summary(resultados: dict[str, dict[str, Any]], split: str) -> p
             fila[clave] = m[clave]
             fila[f"{clave}_cumple"] = objetivo["met"]
         fila["modelo_dice_macro"], fila["modelo_iou_macro"] = m.get("modelo_dice_macro"), m.get("modelo_iou_macro")
+        fila["pertenencia_cobertura"] = m.get("pertenencia_cobertura")
+        fila["pertenencia_gt_f1_macro"] = m.get("pertenencia_gt_f1_macro")
         if "latency" in m:
             fila["latencia_ms_por_corte"] = m["latency"]["pipeline_ms_mean"]
         filas.append(fila)
@@ -887,13 +1041,14 @@ def _write_plane_summary(resultados: dict[str, dict[str, Any]], split: str) -> p
     tabla.to_csv(OUT_DIR / f"resumen_planos_{split}.csv", index=False)
     print(f"\nResumen de los tres planos: {OUT_DIR / f'resumen_planos_{split}.csv'}")
     print(tabla[["plano", "bbox_map50", "bbox_mean_iou", "modelo_fragment_dice", "modelo_fragment_iou",
-                 "classification_f1_macro", "classification_auc_macro"]].to_string(index=False))
+                 "pertenencia_f1_macro", "pertenencia_auc_macro_ovr", "pertenencia_cobertura"]].to_string(index=False))
     return tabla
 
 
 def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
     global DEVICE
     args.checkpoint = _resolve_repo_path(args.checkpoint, "checkpoint")
+    args.cabeza = _resolve_repo_path(args.cabeza, "cabeza de pertenencia")
     if args.sam_checkpoint is not None:
         args.sam_checkpoint = _resolve_repo_path(args.sam_checkpoint, "checkpoint SAM")
     if args.device == "cuda" and not torch.cuda.is_available():
@@ -907,7 +1062,6 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
     fig_dir = FIG_DIR / args.plano if plane_mode else FIG_DIR
     _load_project_components(plane_mode)
     _verify_class_convention()
-    nms_fn = _load_callable(args.nms_function)
     plane_info: dict[str, Any] = {}
     if plane_mode:
         # el payload se lee antes para cargar las piezas del cuaderno de planos (MultiTaskNet incluida)
@@ -915,6 +1069,8 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
             args.plano, torch.load(args.checkpoint, map_location="cpu", weights_only=True)
         )
     model, checkpoint_payload = _load_model(args.checkpoint, DEVICE)
+    cls_head, cabeza_meta = _load_cabeza_pertenencia(args.cabeza, args.checkpoint, DEVICE)
+    componentes = _build_componentes(model, cls_head)
     if not plane_mode:
         # la caché de cortes debe tener los canales que espera el modelo (3 = entrada 2.5D: carpeta <split>_25d)
         _COMPONENTS["DATA_VERSION"]["channels"] = in_channels_del_modelo(checkpoint_payload)
@@ -949,11 +1105,16 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("Los umbrales de inferencia del checkpoint deben estar entre 0 y 1.")
     if min_center_distance < 1 or min_instance_pixels < 1:
         raise ValueError("Los parametros de instancias del checkpoint deben ser positivos.")
-    pipeline_params = {
+    # Configuracion del sistema real. El pipeline usa UN solo umbral de score: las cajas que pasan son las
+    # que se evaluan Y las que guian al decoder (igual que pred_box_score_min en el entrenamiento).
+    pipeline_cfg = {
+        "score_thresh": pred_box_score_min,
+        "iou_thresh": NMS_CONFIG["iou_thresh"] if args.nms_iou is None else args.nms_iou,
+        "max_det_per_class": NMS_CONFIG["max_det_per_class"],
         "center_threshold": center_threshold,
         "min_center_distance": min_center_distance,
         "min_instance_pixels": min_instance_pixels,
-        "pred_box_score_min": pred_box_score_min,
+        "umbral_corte": None,   # solo cortes positivos; el filtro de cortes vacios se evalua con los negativos
     }
     if plane_mode:
         config = plane_info["config"]
@@ -987,11 +1148,14 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
             class_id: {"intersection": 0, "pred": 0, "gt": 0}
             for class_id in CLASS_IDS
         }
-        for name in ("modelo", "sam")
+        for name in ("modelo", "decoder", "sam")
     }
     all_detections: list[dict[str, np.ndarray]] = []
     all_targets: list[dict[str, np.ndarray]] = []
     slice_rows: list[dict[str, Any]] = []
+    pertenencia_pred: list[pd.DataFrame] = []
+    pertenencia_gt: list[pd.DataFrame] = []
+    instance_rows: list[dict[str, Any]] = []
     worst_examples: list[tuple] = []
     best_examples: list[tuple] = []
     elapsed_seconds = 0.0
@@ -1005,18 +1169,44 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
         if DEVICE.type == "cuda":
             torch.cuda.synchronize(DEVICE)
         start = time.perf_counter()
-        detections, segmentation_detections, semantic_predictions, instance_predictions = _run_pipeline(
-            model, images, nms_fn, args, pipeline_params
-        )
+        salidas = _run_pipeline(componentes, images, pipeline_cfg)
         if DEVICE.type == "cuda":
             torch.cuda.synchronize(DEVICE)
         elapsed_seconds += time.perf_counter() - start
 
-        for index, detection in enumerate(detections):
+        # Pertenencia (fuera del cronometro): reutiliza las salidas que el sistema ya calculo.
+        targets_pert = [
+            {"case_id": batch["case_id"][i], "slice_index": int(batch["slice_index"][i]),
+             "instance_mask": batch["instance_mask"][i]}
+            for i in range(len(salidas))
+        ]
+        filas_pred = filas_pertenencia(salidas, targets_pert, "pred", iou_min=IOU_PERTENENCIA)
+        filas_gt = filas_pertenencia(
+            salidas, targets_pert, "gt", probs_gt=probs_pertenencia_gt(componentes, images, targets_pert)
+        )
+        pertenencia_pred.append(filas_pred)
+        pertenencia_gt.append(filas_gt)
+        # Clase real de cada instancia predicha que quedo emparejada (0 = sobra, no corresponde a ningun fragmento)
+        clase_emparejada = {
+            (fila.case_id, fila.slice_index, fila.pred_id): fila.clase_real
+            for fila in filas_pred.itertuples() if fila.pred_id > 0
+        }
+        for salida, target in zip(salidas, targets_pert):
+            for inst in salida["instancias"]:
+                instance_rows.append({
+                    "case_id": target["case_id"], "slice_index": target["slice_index"], "id": inst["id"],
+                    "area_px": inst["area_px"], "clase_cabeza": inst["clase"],
+                    "clase_decoder": inst["clase_semantica"], "conflicto": bool(inst["conflicto_semantica"]),
+                    "sin_caja": bool(inst["sin_caja"]),
+                    "clase_real": clase_emparejada.get((target["case_id"], target["slice_index"], inst["id"]), 0),
+                })
+
+        for index, salida in enumerate(salidas):
+            final = salida["final"]   # cajas DESPUES del NMS del sistema (ya en CPU)
             predicted = {
-                key: value.detach().cpu().numpy()
-                for key, value in detection.items()
-                if key in {"boxes", "scores", "labels"}
+                "boxes": final["boxes"].numpy().reshape(-1, 4),
+                "scores": final["scores"].numpy().reshape(-1),
+                "labels": final["labels"].numpy().reshape(-1),
             }
             target = {
                 "boxes": np.asarray(batch["boxes"][index], dtype=np.float32).reshape(-1, 4),
@@ -1025,9 +1215,12 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
             all_detections.append(predicted)
             all_targets.append(target)
             gt_semantic = _semantic_from_instances(batch["instance_mask"][index].numpy())
-            model_semantic = semantic_predictions[index].astype(np.uint8)
+            # Salida FINAL del sistema: cada instancia pintada con la clase de la cabeza de pertenencia.
+            model_semantic = salida["class_map"].astype(np.uint8)
+            decoder_semantic = salida["semantic_mask"].astype(np.uint8)   # solo diagnostico
             gt_instances = batch["instance_mask"][index].numpy()
-            pred_instances, _, pred_classes = instance_predictions[index]
+            pred_instances = salida["instance_mask"]
+            pred_classes = {inst["id"]: inst["clase"] for inst in salida["instancias"]}
             dice_sum, iou_sum, n_fragments = _fragment_metrics(
                 gt_instances,
                 pred_instances,
@@ -1037,12 +1230,13 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
             fragment_iou_sum += iou_sum
             fragment_count += n_fragments
             _add_semantic_counts(counts, "modelo", model_semantic, gt_semantic)
+            _add_semantic_counts(counts, "decoder", decoder_semantic, gt_semantic)
             sam_semantic = None
             if sam_predictor is not None:
                 sam_semantic = _sam_semantic(
                     sam_predictor,
                     batch["image"][index, :image_channels].numpy(),
-                    segmentation_detections[index],
+                    final,
                 )
                 _add_semantic_counts(counts, "sam", sam_semantic, gt_semantic)
 
@@ -1063,6 +1257,9 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
                 "slice_index": int(batch["slice_index"][index]),
                 "n_gt_boxes": len(target["labels"]),
                 "n_pred_boxes": len(predicted["labels"]),
+                "n_pred_instances": len(salida["instancias"]),
+                "n_conflicto_semantica": sum(inst["conflicto_semantica"] for inst in salida["instancias"]),
+                "n_sin_caja": sum(inst["sin_caja"] for inst in salida["instancias"]),
                 "model_region_dice": score,
                 "model_fragment_dice": dice_sum / n_fragments if n_fragments else math.nan,
                 "model_fragment_iou": iou_sum / n_fragments if n_fragments else math.nan,
@@ -1083,13 +1280,18 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
         "n_cases": int(cache["meta"]["case_id"].nunique()),
         "mean_inference_ms_per_slice_batched": elapsed_seconds * 1000 / len(dataset),  # rendimiento, no latencia
         "cls_threshold": args.cls_threshold,
-        "score_threshold": args.score_threshold,
-        "nms_iou": args.nms_iou,
+        "pipeline": "src.pipeline_pengwin:inferir_cortes",
+        "score_thresh": pipeline_cfg["score_thresh"],
+        "nms_iou": pipeline_cfg["iou_thresh"],
+        "max_det_per_class": pipeline_cfg["max_det_per_class"],
+        "umbral_corte": pipeline_cfg["umbral_corte"],
+        "cabeza_pertenencia": args.cabeza.relative_to(ROOT).as_posix(),
+        "cabeza_tronco_sha256_16": cabeza_meta.get("tronco_sha256_16"),
         "evaluated_slices_note": "solo cortes positivos del manifiesto (con al menos una region GT)",
         "n_ground_truth_fragments": fragment_count,
         "modelo_fragment_dice": fragment_dice_sum / fragment_count if fragment_count else math.nan,
         "modelo_fragment_iou": fragment_iou_sum / fragment_count if fragment_count else math.nan,
-        "nms_function": args.nms_function,
+        "nms_function": NMS_REFERENCIA,
         "sam": "evaluated" if sam_predictor is not None else "not_requested",
     }
     if plane_mode:
@@ -1101,18 +1303,29 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
                                     if plane_info["config"].get("USE_POSITION_CHANNEL") else None),
         })
     metrics.update(_classification_metrics(all_detections, all_targets, args.cls_threshold))
+    pertenencia, resumen_pertenencia, pertenencia_tamano = _pertenencia_metrics(
+        pd.concat(pertenencia_pred, ignore_index=True),
+        pd.concat(pertenencia_gt, ignore_index=True),
+        pd.DataFrame(instance_rows),
+        out_dir,
+        args.split,
+        fig_dir=fig_dir,
+        nombre_modelo=f"modelo {args.plano}" if args.plano else "modelo anterior",
+    )
+    metrics.update(pertenencia)
     metrics.update(_detection_metrics(all_detections, all_targets))
     metrics.update(_semantic_metrics(counts, "modelo"))
+    metrics.update(_semantic_metrics(counts, "decoder"))
     if sam_predictor is not None:
         metrics.update(_semantic_metrics(counts, "sam"))
         metrics["sam_checkpoint"] = args.sam_checkpoint.relative_to(ROOT).as_posix()
         metrics["sam_model_type"] = args.sam_type
     metrics["targets"] = {
-        "classification_f1_macro": {"minimum": 0.85, "met": metrics["classification_f1_macro"] >= 0.85},
-        "classification_auc_macro": {
+        "pertenencia_f1_macro": {"minimum": 0.85, "met": metrics["pertenencia_f1_macro"] >= 0.85},
+        "pertenencia_auc_macro_ovr": {
             "minimum": 0.85,
-            "met": math.isfinite(metrics["classification_auc_macro"])
-            and metrics["classification_auc_macro"] >= 0.85,
+            "met": math.isfinite(metrics["pertenencia_auc_macro_ovr"])
+            and metrics["pertenencia_auc_macro_ovr"] >= 0.85,
         },
         "bbox_mean_iou": {"minimum": 0.65, "met": metrics["bbox_mean_iou"] >= 0.65},
         "bbox_map50": {"minimum": 0.65, "met": metrics["bbox_map50"] >= 0.65},
@@ -1130,7 +1343,7 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
     fig_dir.mkdir(parents=True, exist_ok=True)
     if args.latency_runs > 0:
-        latency = _measure_latency(model, dataset, nms_fn, args, pipeline_params, sam_predictor,
+        latency = _measure_latency(componentes, dataset, args, pipeline_cfg, sam_predictor,
                                    image_channels=image_channels)
         metrics["latency"] = latency
         (out_dir / f"latencia_{args.split}_{DEVICE.type}.json").write_text(
@@ -1164,6 +1377,14 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
         print(f"Latencia (batch=1, {DEVICE}): media {lat['pipeline_ms_mean']:.1f} ms | "
               f"p50 {lat['pipeline_ms_p50']:.1f} | p95 {lat['pipeline_ms_p95']:.1f} ms/corte.")
     print(comparison.to_string(index=False))
+    print("\nPertenencia: cabeza vs reglas base (F1 y exactitud sobre TODOS los fragmentos reales)")
+    print(resumen_pertenencia.round(3).to_string(index=False))
+    print("\nPertenencia por tamano del fragmento")
+    print(pertenencia_tamano.round(3).to_string(index=False))
+    print(f"\nConflictos cabeza vs decoder: {metrics['conflictos_cabeza_decoder']} de "
+          f"{metrics['n_instancias_predichas']} instancias ({metrics['conflictos_frac']:.1%}). "
+          f"En los {metrics['conflictos_emparejados']} emparejados con un fragmento real acierta la cabeza "
+          f"{metrics['conflictos_acierta_cabeza']:.1%} y el decoder {metrics['conflictos_acierta_decoder']:.1%}.")
     if sam_predictor is None:
         print("SAM omitido: pasa --sam-checkpoint para ejecutar la comparacion zero-shot en test.")
     return metrics
@@ -1176,26 +1397,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint", type=Path, default=None,
                         help="Por defecto modelo_multitarea_{plano}.pt (o modelo_multitarea_final.pt con --plano anterior).")
     parser.add_argument("--split", choices=("val", "test"), default="test")
-    parser.add_argument(
-        "--nms-function",
-        required=True,
-        help="Funcion NMS de Fabian como modulo:funcion (cajas, scores, clases, umbral_iou)->indices.",
-    )
+    parser.add_argument("--cabeza", type=Path, default=None,
+                        help="Pesos de la cabeza de pertenencia; por defecto cabeza_pertenencia_{plano}.pt "
+                             "(o cabeza_pertenencia.pt con --plano anterior). Se verifica contra el tronco.")
     parser.add_argument("--sam-checkpoint", type=Path)
     parser.add_argument("--sam-type", choices=("vit_b", "vit_l", "vit_h"), default="vit_b")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
-    parser.add_argument("--score-threshold", type=float, default=0.01,
-                        help="Score minimo de las cajas que salen del postproceso (bajo, para el calculo de AP).")
     parser.add_argument("--cls-threshold", type=float, default=0.5,
                         help="Umbral de score para decidir si una region esta PRESENTE (F1 de clasificacion).")
     parser.add_argument("--latency-runs", type=int, default=50,
                         help="Cortes medidos con batch=1 para la latencia (0 la desactiva).")
-    parser.add_argument("--nms-iou", type=float, default=0.5)
+    parser.add_argument("--nms-iou", type=float, default=None,
+                        help="Solo para experimentos: por defecto se usa NMS_CONFIG del sistema.")
     args = parser.parse_args()
     if args.batch_size < 1:
         parser.error("--batch-size debe ser positivo.")
-    if not all(0 <= value <= 1 for value in (args.score_threshold, args.nms_iou, args.cls_threshold)):
+    if not 0 <= args.cls_threshold <= 1 or (args.nms_iou is not None and not 0 <= args.nms_iou <= 1):
         parser.error("Los umbrales deben estar entre 0 y 1.")
     if args.latency_runs < 0:
         parser.error("--latency-runs no puede ser negativo.")
