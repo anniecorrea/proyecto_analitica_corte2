@@ -1,0 +1,16 @@
+{
+  "backbone": "FundidoraPCPlus (build_backbone('plus', in_channels=3))",
+  "dataset": "Oxford-IIIT Pet",
+  "tarea": "clasificación de 37 razas",
+  "imagenes_train": 3680,
+  "imagenes_val": 3669,
+  "entrada": "gris repetido en 3 canales, [0, 1], recorte 256 de 288",
+  "mejor_exactitud_val": 0.6437721449986372,
+  "mejor_epoca": 59,
+  "epochs": 60,
+  "lr": 0.002,
+  "batch_size": 64,
+  "seed": 42,
+  "minutos": 5.4,
+  "nota": "solo se guarda el backbone; el clasificador se descarta"
+}

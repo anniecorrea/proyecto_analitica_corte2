@@ -1,0 +1,13 @@
+plano,variante,casos,conminutos,n_separado,n_fusionado,n_omitido,principales_ok,principales,mae_mm,mediana_error_mm,max_error_mm,mae_separados_mm,conminutos_separados_en_gt,mae_separados_en_gt_mm,fragmentos_predichos,fragmentos_reales
+axial,actual,5,12,0,10,2,15,15,0.0,0.0,0.0,,1,,16,27
+axial,sin_absorcion,5,12,0,10,2,15,15,0.0,0.0,0.0,,1,,26,27
+axial,centros_finos,5,12,0,8,4,15,15,0.0,0.0,0.0,,1,,19,27
+axial,ambos,5,12,2,5,5,14,15,3.2437982162390715,0.0,22.7065875136735,11.35329375683675,1,,108,27
+coronal,actual,5,12,0,10,2,14,15,1.0056456078952571,0.0,10.056456078952571,,1,10.056456078952571,23,27
+coronal,sin_absorcion,5,12,2,6,4,14,15,2.1237562286190714,0.0,10.056456078952571,3.466796875,1,10.056456078952571,53,27
+coronal,centros_finos,5,12,0,7,5,14,15,1.4366365827075103,0.0,10.056456078952571,,1,10.056456078952571,27,27
+coronal,ambos,5,12,2,1,9,14,15,0.0,0.0,0.0,0.0,1,,120,27
+sagital,actual,5,12,0,8,4,15,15,0.0,0.0,0.0,,1,,21,27
+sagital,sin_absorcion,5,12,3,3,6,15,15,1.0416666666666667,0.0,6.25,2.0833333333333335,1,,59,27
+sagital,centros_finos,5,12,0,5,7,15,15,0.0,0.0,0.0,,1,,23,27
+sagital,ambos,5,12,1,5,6,14,15,1.6927083333333333,0.0,10.15625,10.15625,1,,97,27

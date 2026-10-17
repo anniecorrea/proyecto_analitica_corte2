@@ -99,8 +99,9 @@ def _dataset_del_split(plano: str, split: str, positivos: pd.DataFrame, config: 
 
 
 def entrenar_plano(plano: str, args: argparse.Namespace) -> dict:
-    checkpoint = ev.checkpoint_del_plano(plano)
-    salida = ev.cabeza_del_plano(plano)
+    # --checkpoint / --salida: otro tronco del mismo plano (modelo de la etapa B o de la ablacion)
+    checkpoint = getattr(args, "checkpoint", None) or ev.checkpoint_del_plano(plano)
+    salida = getattr(args, "salida", None) or ev.cabeza_del_plano(plano)
     if not checkpoint.is_file() or checkpoint.stat().st_size < 10_000:
         raise FileNotFoundError(f"Falta {checkpoint} (o es un puntero de Git LFS: correr `git lfs pull`).")
     tronco_id = hashlib.sha256(checkpoint.read_bytes()).hexdigest()[:16]
@@ -158,7 +159,8 @@ def entrenar_plano(plano: str, args: argparse.Namespace) -> dict:
     }
     meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
     HISTORIAL_DIR.mkdir(parents=True, exist_ok=True)
-    historial.to_csv(HISTORIAL_DIR / f"historial_etapa_D_{plano}.csv", index=False)
+    sufijo = salida.stem.removeprefix("cabeza_pertenencia_")      # axial, axial_B, axial_ablacion_sin_cbam...
+    historial.to_csv(HISTORIAL_DIR / f"historial_etapa_D_{sufijo}.csv", index=False)
     print(f"[{plano}] mejor epoca {meta['mejor_epoca']}: F1 val {meta['val_f1_macro']:.3f} | "
           f"AUC val {meta['val_auc_macro_ovr']:.3f} | {salida.name} guardada ({meta['minutos']} min)")
     del cache_train, cache_val, head
@@ -181,7 +183,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=16, help="Cortes por lote al precalcular f4.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--reentrenar", action="store_true", help="Repite aunque ya exista la cabeza de ese tronco.")
+    parser.add_argument("--checkpoint", type=Path, default=None,
+                        help="Solo con un plano: tronco distinto del modelo final (p. ej. el de la etapa B o de la ablación).")
+    parser.add_argument("--salida", type=Path, default=None,
+                        help="Solo con un plano: archivo de la cabeza (por defecto cabeza_pertenencia_{plano}.pt).")
     args = parser.parse_args()
+    if (args.checkpoint or args.salida) and args.plano == "todos":
+        parser.error("--checkpoint y --salida solo se pueden usar con un plano.")
+    args.checkpoint = None if args.checkpoint is None else (args.checkpoint if args.checkpoint.is_absolute()
+                                                            else ROOT / args.checkpoint)
+    args.salida = None if args.salida is None else (args.salida if args.salida.is_absolute() else ROOT / args.salida)
     if args.device == "cuda" and not torch.cuda.is_available():
         parser.error("Se pidio --device cuda pero PyTorch no ve ninguna GPU.")
     return args

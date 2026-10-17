@@ -1,0 +1,52 @@
+D:\proyecto_analitica_corte2\.venv\Scripts\python.exe -u -m src.resumen_ablacion --split test
+
+
+Etapa C frente a B (test; diferencia = C - B):
+  plano                          metrica  referencia  nuevo  diferencia  ic95_inf  ic95_sup relevante
+  axial               Dice por fragmento      0.7913 0.7927      0.0014   -0.0031    0.0055     False
+  axial                IoU por fragmento      0.7027 0.7043      0.0016   -0.0036    0.0065     False
+  axial          F1 pertenencia (cabeza)      0.8839 0.8856      0.0016   -0.0030    0.0065     False
+  axial F1 pertenencia (regla semántica)      0.8886 0.8885     -0.0001   -0.0050    0.0049     False
+  axial                         mAP@0.50      0.9363 0.9331     -0.0032       NaN       NaN      None
+  axial                    mAP@[.50:.95]      0.6849 0.6917      0.0068       NaN       NaN      None
+  axial                     IoU de cajas      0.8535 0.8549      0.0014       NaN       NaN      None
+coronal               Dice por fragmento      0.7570 0.7388     -0.0182   -0.0247   -0.0121      True
+coronal                IoU por fragmento      0.6606 0.6359     -0.0247   -0.0320   -0.0180      True
+coronal          F1 pertenencia (cabeza)      0.8533 0.8190     -0.0343   -0.0484   -0.0238      True
+coronal F1 pertenencia (regla semántica)      0.8589 0.8233     -0.0356   -0.0490   -0.0261      True
+coronal                         mAP@0.50      0.8772 0.8661     -0.0110       NaN       NaN      None
+coronal                    mAP@[.50:.95]      0.5690 0.5553     -0.0137       NaN       NaN      None
+coronal                     IoU de cajas      0.7914 0.7870     -0.0044       NaN       NaN      None
+sagital               Dice por fragmento      0.7803 0.7895      0.0093    0.0036    0.0152     False
+sagital                IoU por fragmento      0.6992 0.7146      0.0154    0.0093    0.0220      True
+sagital          F1 pertenencia (cabeza)      0.8796 0.8882      0.0085    0.0013    0.0155     False
+sagital F1 pertenencia (regla semántica)      0.8857 0.8937      0.0080    0.0021    0.0139     False
+sagital                         mAP@0.50      0.9176 0.9185      0.0008       NaN       NaN      None
+sagital                    mAP@[.50:.95]      0.7077 0.7111      0.0033       NaN       NaN      None
+sagital                     IoU de cajas      0.8517 0.8519      0.0001       NaN       NaN      None
+
+Ablación en el plano axial, etapa B (test; diferencia = variante - base con CBAM y sin TL):
+       variante                          metrica  referencia  nuevo  diferencia  ic95_inf  ic95_sup relevante
+       sin_cbam               Dice por fragmento      0.7913 0.7835     -0.0078   -0.0162    0.0002     False
+       sin_cbam                IoU por fragmento      0.7027 0.6940     -0.0087   -0.0173   -0.0001     False
+       sin_cbam          F1 pertenencia (cabeza)      0.8839 0.8784     -0.0055   -0.0111    0.0010     False
+       sin_cbam F1 pertenencia (regla semántica)      0.8886 0.8800     -0.0085   -0.0160   -0.0011     False
+       sin_cbam                         mAP@0.50      0.9363 0.9253     -0.0110       NaN       NaN      None
+       sin_cbam                    mAP@[.50:.95]      0.6849 0.6815     -0.0033       NaN       NaN      None
+       sin_cbam                     IoU de cajas      0.8535 0.8506     -0.0030       NaN       NaN      None
+         con_tl               Dice por fragmento      0.7913 0.7950      0.0037   -0.0035    0.0112     False
+         con_tl                IoU por fragmento      0.7027 0.7077      0.0050   -0.0027    0.0130     False
+         con_tl          F1 pertenencia (cabeza)      0.8839 0.8802     -0.0037   -0.0080    0.0012     False
+         con_tl F1 pertenencia (regla semántica)      0.8886 0.8856     -0.0029   -0.0101    0.0039     False
+         con_tl                         mAP@0.50      0.9363 0.9283     -0.0081       NaN       NaN      None
+         con_tl                    mAP@[.50:.95]      0.6849 0.6817     -0.0031       NaN       NaN      None
+         con_tl                     IoU de cajas      0.8535 0.8488     -0.0047       NaN       NaN      None
+sin_cbam_con_tl               Dice por fragmento      0.7913 0.7857     -0.0055   -0.0127    0.0007     False
+sin_cbam_con_tl                IoU por fragmento      0.7027 0.6985     -0.0042   -0.0112    0.0023     False
+sin_cbam_con_tl          F1 pertenencia (cabeza)      0.8839 0.8760     -0.0079   -0.0138   -0.0021     False
+sin_cbam_con_tl F1 pertenencia (regla semántica)      0.8886 0.8781     -0.0105   -0.0183   -0.0034      True
+sin_cbam_con_tl                         mAP@0.50      0.9363 0.9320     -0.0043       NaN       NaN      None
+sin_cbam_con_tl                    mAP@[.50:.95]      0.6849 0.6776     -0.0073       NaN       NaN      None
+sin_cbam_con_tl                     IoU de cajas      0.8535 0.8482     -0.0053       NaN       NaN      None
+
+Guardado en resultados\metricas\comparaciones

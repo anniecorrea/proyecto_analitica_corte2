@@ -1,0 +1,5 @@
+,pred_sin_clase,pred_sacro,pred_coxal_izquierdo,pred_coxal_derecho
+real_sin_clase,0,0,0,0
+real_sacro,0,3987,27,6
+real_coxal_izquierdo,0,40,5901,42
+real_coxal_derecho,0,59,2,5977

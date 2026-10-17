@@ -1,0 +1,89 @@
+{
+  "split": "val",
+  "plano": "axial",
+  "checkpoint": "resultados/modelos/entrenamiento_multitarea_axial/modelo_multitarea_axial_B.pt",
+  "checkpoint_stage": "B_decoder",
+  "device": "cuda",
+  "n_slices": 1265,
+  "n_cases": 5,
+  "mean_inference_ms_per_slice_batched": 20.228337865643084,
+  "cls_threshold": 0.5,
+  "pipeline": "src.pipeline_pengwin:inferir_cortes",
+  "score_thresh": 0.05,
+  "nms_iou": 0.5,
+  "max_det_per_class": 1,
+  "umbral_corte": null,
+  "cabeza_pertenencia": "resultados/modelos/nms_pertenencia/cabeza_pertenencia_axial_B.pt",
+  "cabeza_tronco_sha256_16": "2de7eda55cb68967",
+  "evaluated_slices_note": "solo cortes positivos del manifiesto (con al menos una region GT)",
+  "n_ground_truth_fragments": 3947,
+  "modelo_fragment_dice": 0.7773998425287669,
+  "modelo_fragment_iou": 0.6851332504857255,
+  "nms_function": "src.deteccion_grid:nms_por_clase",
+  "sam": "not_requested",
+  "datos": "cache de cortes de Entrenamiento_multitarea_planos.ipynb (mismo preprocesamiento del entrenamiento)",
+  "datos_iguales_al_entrenamiento": true,
+  "diferencias_datos": [],
+  "linea_media_sagital": null,
+  "presencia_region_f1_macro": 0.9750308833363004,
+  "presencia_region_f1_micro": 0.9788732394366197,
+  "presencia_region_auc_macro": 0.9859372352837251,
+  "pertenencia_n_fragmentos": 3947,
+  "pertenencia_cobertura": 0.797567772992146,
+  "pertenencia_f1_macro": 0.8763602818297481,
+  "pertenencia_exactitud": 0.7957942741322523,
+  "pertenencia_f1_sacro": 0.8031496062992126,
+  "pertenencia_f1_coxal_izquierdo": 0.9109639440765268,
+  "pertenencia_f1_coxal_derecho": 0.9149672951135052,
+  "pertenencia_auc_macro_ovr": 0.9997818166387912,
+  "pertenencia_gt_f1_macro": 0.984897352086945,
+  "pertenencia_gt_exactitud": 0.9850519381808969,
+  "pertenencia_gt_auc_macro_ovr": 0.9988185751203128,
+  "regla_semantica_f1_macro": 0.8782868724099065,
+  "regla_caja_f1_macro": 0.8768891171602027,
+  "regla_semantica_gt_f1_macro": 0.9886557785887601,
+  "n_instancias_predichas": 8578,
+  "conflictos_cabeza_decoder": 438,
+  "conflictos_frac": 0.051060853345768244,
+  "conflictos_emparejados": 7,
+  "conflictos_acierta_cabeza": 0.0,
+  "conflictos_acierta_decoder": 1.0,
+  "bbox_mean_iou": 0.844285996361235,
+  "bbox_mean_iou_best_candidate": 0.844285996361235,
+  "bbox_map50": 0.9280504627031888,
+  "bbox_map50_95": 0.6745577841618251,
+  "modelo_dice_macro": 0.9527204154613719,
+  "modelo_iou_macro": 0.91032134313622,
+  "decoder_dice_macro": 0.9584005423557865,
+  "decoder_iou_macro": 0.9206881992032167,
+  "targets": {
+    "pertenencia_f1_macro": {
+      "minimum": 0.85,
+      "met": true
+    },
+    "pertenencia_auc_macro_ovr": {
+      "minimum": 0.85,
+      "met": true
+    },
+    "bbox_mean_iou": {
+      "minimum": 0.65,
+      "met": true
+    },
+    "bbox_map50": {
+      "minimum": 0.65,
+      "met": true
+    },
+    "bbox_map50_95": {
+      "minimum": 0.4,
+      "met": true
+    },
+    "modelo_fragment_dice": {
+      "minimum": 0.85,
+      "met": false
+    },
+    "modelo_fragment_iou": {
+      "minimum": 0.7,
+      "met": false
+    }
+  }
+}

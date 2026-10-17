@@ -1,0 +1,140 @@
+{
+  "exportar_B_axial": {
+    "estado": "hecho"
+  },
+  "exportar_B_coronal": {
+    "estado": "hecho"
+  },
+  "exportar_B_sagital": {
+    "estado": "hecho"
+  },
+  "cabeza_B_axial": {
+    "estado": "hecho"
+  },
+  "cabeza_B_coronal": {
+    "estado": "ok",
+    "minutos": 1.3,
+    "fin": "2026-10-17 01:31",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\cabeza_B_coronal.log"
+  },
+  "cabeza_B_sagital": {
+    "estado": "ok",
+    "minutos": 1.1,
+    "fin": "2026-10-17 01:32",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\cabeza_B_sagital.log"
+  },
+  "eval_test_C": {
+    "estado": "ok",
+    "minutos": 64.9,
+    "fin": "2026-10-17 02:37",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\eval_test_C.log"
+  },
+  "eval_test_B_axial": {
+    "estado": "ok",
+    "minutos": 2.8,
+    "fin": "2026-10-17 02:40",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\eval_test_B_axial.log"
+  },
+  "eval_test_B_coronal": {
+    "estado": "ok",
+    "minutos": 2.1,
+    "fin": "2026-10-17 02:42",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\eval_test_B_coronal.log"
+  },
+  "eval_test_B_sagital": {
+    "estado": "ok",
+    "minutos": 2.9,
+    "fin": "2026-10-17 02:45",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\eval_test_B_sagital.log"
+  },
+  "verificar_planos_val": {
+    "estado": "ok",
+    "minutos": 9.1,
+    "fin": "2026-10-17 02:54",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\verificar_planos_val.log"
+  },
+  "preentrenar_pets": {
+    "estado": "ok",
+    "minutos": 5.6,
+    "fin": "2026-10-17 02:59",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\preentrenar_pets.log"
+  },
+  "prueba_sin_cbam": {
+    "estado": "ok",
+    "minutos": 0.5,
+    "fin": "2026-10-17 03:00",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\prueba_sin_cbam.log"
+  },
+  "prueba_con_tl": {
+    "estado": "ok",
+    "minutos": 0.4,
+    "fin": "2026-10-17 03:00",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\prueba_con_tl.log"
+  },
+  "prueba_sin_cbam_con_tl": {
+    "estado": "ok",
+    "minutos": 0.4,
+    "fin": "2026-10-17 03:01",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\prueba_sin_cbam_con_tl.log"
+  },
+  "entrenar_sin_cbam": {
+    "estado": "ok",
+    "minutos": 59.2,
+    "fin": "2026-10-17 04:00",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\entrenar_sin_cbam.log"
+  },
+  "entrenar_con_tl": {
+    "estado": "ok",
+    "minutos": 56.8,
+    "fin": "2026-10-17 04:57",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\entrenar_con_tl.log"
+  },
+  "entrenar_sin_cbam_con_tl": {
+    "estado": "ok",
+    "minutos": 56.6,
+    "fin": "2026-10-17 05:53",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\entrenar_sin_cbam_con_tl.log"
+  },
+  "cabeza_sin_cbam": {
+    "estado": "ok",
+    "minutos": 0.9,
+    "fin": "2026-10-17 05:54",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\cabeza_sin_cbam.log"
+  },
+  "eval_test_sin_cbam": {
+    "estado": "ok",
+    "minutos": 2.9,
+    "fin": "2026-10-17 05:57",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\eval_test_sin_cbam.log"
+  },
+  "cabeza_con_tl": {
+    "estado": "ok",
+    "minutos": 0.5,
+    "fin": "2026-10-17 05:58",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\cabeza_con_tl.log"
+  },
+  "eval_test_con_tl": {
+    "estado": "ok",
+    "minutos": 2.5,
+    "fin": "2026-10-17 06:00",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\eval_test_con_tl.log"
+  },
+  "cabeza_sin_cbam_con_tl": {
+    "estado": "ok",
+    "minutos": 0.6,
+    "fin": "2026-10-17 06:01",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\cabeza_sin_cbam_con_tl.log"
+  },
+  "eval_test_sin_cbam_con_tl": {
+    "estado": "ok",
+    "minutos": 2.6,
+    "fin": "2026-10-17 06:03",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\eval_test_sin_cbam_con_tl.log"
+  },
+  "resumen": {
+    "estado": "ok",
+    "minutos": 1.3,
+    "fin": "2026-10-17 06:05",
+    "log": "resultados\\metricas\\corrida_pendientes\\logs\\resumen.log"
+  }
+}

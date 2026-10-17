@@ -1,0 +1,41 @@
+D:\proyecto_analitica_corte2\.venv\Scripts\python.exe -u -m src.evaluacion --plano sagital --split test --checkpoint resultados\modelos\entrenamiento_multitarea_sagital\modelo_multitarea_sagital_B.pt --cabeza resultados\modelos\nms_pertenencia\cabeza_pertenencia_sagital_B.pt --etiqueta sagital_B --latency-runs 0 --device cuda
+
+
+===== Modelo sagital (modelo_multitarea_sagital_B.pt) | split=test =====
+[sagital_pos_test_25d] caché cargada: 6658 cortes
+Evaluacion terminada: 6658 cortes de 20 casos.
+Metricas: D:\proyecto_analitica_corte2\resultados\metricas\evaluacion\sagital_B\metricas_test.json
+                                           Metrica Objetivo Modelo SAM Cumple
+           Pertenencia F1 macro (sistema completo)  >= 0.85  0.880   -     si
+Pertenencia AUC macro OvR (fragmentos emparejados)  >= 0.85  1.000   -     si
+              Cobertura de fragmentos (IoU >= 0.5)           0.795   -       
+  Pertenencia F1 con mascaras reales (diagnostico)           0.979   -       
+   Regla semantica F1 (baseline, sistema completo)           0.886   -       
+    Presencia de region F1 (detector, diagnostico)           0.981   -       
+                            Deteccion IoU promedio  >= 0.65  0.852   -     si
+                                Deteccion mAP@0.50  >= 0.65  0.918   -     si
+                         Deteccion mAP@[0.50:0.95]  >= 0.40  0.708   -     si
+                   Segmentacion Dice por fragmento  >= 0.85  0.780   -     no
+                    Segmentacion IoU por fragmento  >= 0.70  0.699   -     no
+              Dice semantico macro (modelo vs SAM)           0.951 n/a       
+               IoU semantico macro (modelo vs SAM)           0.907 n/a       
+    Dice semantico macro del decoder (diagnostico)           0.959   -       
+
+Pertenencia: cabeza vs reglas base (F1 y exactitud sobre TODOS los fragmentos reales)
+                modo                  metodo  n_instancias  n_sin_clase  exactitud  f1_macro  f1_sacro  f1_coxal_izquierdo  f1_coxal_derecho  auc_macro_ovr
+instancias_predichas      cabeza_pertenencia         11721         2401      0.789     0.880     0.890               0.864             0.885          1.000
+instancias_predichas regla_mayoria_semantica         11721         2401      0.794     0.886     0.894               0.872             0.892            NaN
+instancias_predichas    regla_caja_detectada         11721         2411      0.727     0.803     0.738               0.824             0.846            NaN
+     mascaras_reales      cabeza_pertenencia         11721            0      0.979     0.979     0.976               0.977             0.983          0.999
+     mascaras_reales regla_mayoria_semantica         11721           52      0.988     0.990     0.989               0.992             0.990            NaN
+     mascaras_reales    regla_caja_detectada         11721           89      0.907     0.902     0.833               0.939             0.934            NaN
+
+Pertenencia por tamano del fragmento
+tamano_fragmento  n_fragmentos_reales  cobertura  exactitud_cabeza_mascara_real  exactitud_cabeza_emparejados  exactitud_decoder_emparejados  n_instancias_predichas  frac_instancias_sin_emparejar  frac_conflicto_cabeza_decoder
+         <100 px                 1522      0.405                          0.912                         0.937                          0.992                    9397                          0.925                          0.126
+      100-399 px                 3003      0.778                          0.971                         0.988                          0.998                    5946                          0.577                          0.034
+     400-1599 px                 5233      0.889                          0.996                         0.999                          1.000                    6273                          0.240                          0.007
+       >=1600 px                 1963      0.874                          0.996                         0.999                          1.000                    1523                          0.128                          0.000
+
+Conflictos cabeza vs decoder: 1424 de 23139 instancias (6.2%). En los 69 emparejados con un fragmento real acierta la cabeza 0.0% y el decoder 95.7%.
+SAM omitido: pasa --sam-checkpoint para ejecutar la comparacion zero-shot en test.

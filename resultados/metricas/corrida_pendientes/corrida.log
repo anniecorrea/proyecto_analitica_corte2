@@ -1,0 +1,48 @@
+[2026-10-17 01:29:58] INICIO | 25 pasos | D:\proyecto_analitica_corte2\.venv\Scripts\python.exe
+[2026-10-17 01:29:58] [exportar_B_axial] ya está hecho: se omite
+[2026-10-17 01:29:58] [exportar_B_coronal] ya está hecho: se omite
+[2026-10-17 01:29:58] [exportar_B_sagital] ya está hecho: se omite
+[2026-10-17 01:29:58] [cabeza_B_axial] ya está hecho: se omite
+[2026-10-17 01:29:58] [cabeza_B_coronal] Cabeza de pertenencia sobre el tronco B (coronal) (~2 min) -> resultados\metricas\corrida_pendientes\logs\cabeza_B_coronal.log
+[2026-10-17 01:31:18] [cabeza_B_coronal] OK en 1.3 min
+[2026-10-17 01:31:18] [cabeza_B_sagital] Cabeza de pertenencia sobre el tronco B (sagital) (~2 min) -> resultados\metricas\corrida_pendientes\logs\cabeza_B_sagital.log
+[2026-10-17 01:32:26] [cabeza_B_sagital] OK en 1.1 min
+[2026-10-17 01:32:26] [eval_test_C] Evaluar en test los modelos en uso (etapa C) con SAM: cifras finales (~100 min) -> resultados\metricas\corrida_pendientes\logs\eval_test_C.log
+[2026-10-17 02:37:22] [eval_test_C] OK en 64.9 min
+[2026-10-17 02:37:22] [eval_test_B_axial] Evaluar en test el modelo B (axial), sin SAM (~10 min) -> resultados\metricas\corrida_pendientes\logs\eval_test_B_axial.log
+[2026-10-17 02:40:08] [eval_test_B_axial] OK en 2.8 min
+[2026-10-17 02:40:08] [eval_test_B_coronal] Evaluar en test el modelo B (coronal), sin SAM (~10 min) -> resultados\metricas\corrida_pendientes\logs\eval_test_B_coronal.log
+[2026-10-17 02:42:16] [eval_test_B_coronal] OK en 2.1 min
+[2026-10-17 02:42:16] [eval_test_B_sagital] Evaluar en test el modelo B (sagital), sin SAM (~10 min) -> resultados\metricas\corrida_pendientes\logs\eval_test_B_sagital.log
+[2026-10-17 02:45:08] [eval_test_B_sagital] OK en 2.9 min
+[2026-10-17 02:45:08] [verificar_planos_val] Verificación en val del control de pelvis y de los conminutos (src/verificar_planos_val.py) (~40 min) -> resultados\metricas\corrida_pendientes\logs\verificar_planos_val.log
+[2026-10-17 02:54:17] [verificar_planos_val] OK en 9.1 min
+[2026-10-17 02:54:17] [preentrenar_pets] Preentrenar FundidoraPC en Oxford-IIIT Pet (transfer learning) (~8 min) -> resultados\metricas\corrida_pendientes\logs\preentrenar_pets.log
+[2026-10-17 02:59:51] [preentrenar_pets] OK en 5.6 min
+[2026-10-17 02:59:51] [prueba_sin_cbam] Prueba corta de la ablación sin_cbam (~2 min) -> resultados\metricas\corrida_pendientes\logs\prueba_sin_cbam.log
+[2026-10-17 03:00:22] [prueba_sin_cbam] OK en 0.5 min
+[2026-10-17 03:00:22] [prueba_con_tl] Prueba corta de la ablación con_tl (~2 min) -> resultados\metricas\corrida_pendientes\logs\prueba_con_tl.log
+[2026-10-17 03:00:47] [prueba_con_tl] OK en 0.4 min
+[2026-10-17 03:00:47] [prueba_sin_cbam_con_tl] Prueba corta de la ablación sin_cbam_con_tl (~2 min) -> resultados\metricas\corrida_pendientes\logs\prueba_sin_cbam_con_tl.log
+[2026-10-17 03:01:13] [prueba_sin_cbam_con_tl] OK en 0.4 min
+[2026-10-17 03:01:13] [entrenar_sin_cbam] Entrenar la variante sin_cbam (axial, etapas A y B) (~95 min) -> resultados\metricas\corrida_pendientes\logs\entrenar_sin_cbam.log
+[2026-10-17 04:00:25] [entrenar_sin_cbam] OK en 59.2 min
+[2026-10-17 04:00:25] [entrenar_con_tl] Entrenar la variante con_tl (axial, etapas A y B) (~95 min) -> resultados\metricas\corrida_pendientes\logs\entrenar_con_tl.log
+[2026-10-17 04:57:13] [entrenar_con_tl] OK en 56.8 min
+[2026-10-17 04:57:13] [entrenar_sin_cbam_con_tl] Entrenar la variante sin_cbam_con_tl (axial, etapas A y B) (~95 min) -> resultados\metricas\corrida_pendientes\logs\entrenar_sin_cbam_con_tl.log
+[2026-10-17 05:53:49] [entrenar_sin_cbam_con_tl] OK en 56.6 min
+[2026-10-17 05:53:49] [cabeza_sin_cbam] Cabeza de pertenencia de la variante sin_cbam (~2 min) -> resultados\metricas\corrida_pendientes\logs\cabeza_sin_cbam.log
+[2026-10-17 05:54:41] [cabeza_sin_cbam] OK en 0.9 min
+[2026-10-17 05:54:41] [eval_test_sin_cbam] Evaluar en test la variante sin_cbam, sin SAM (~10 min) -> resultados\metricas\corrida_pendientes\logs\eval_test_sin_cbam.log
+[2026-10-17 05:57:35] [eval_test_sin_cbam] OK en 2.9 min
+[2026-10-17 05:57:35] [cabeza_con_tl] Cabeza de pertenencia de la variante con_tl (~2 min) -> resultados\metricas\corrida_pendientes\logs\cabeza_con_tl.log
+[2026-10-17 05:58:04] [cabeza_con_tl] OK en 0.5 min
+[2026-10-17 05:58:04] [eval_test_con_tl] Evaluar en test la variante con_tl, sin SAM (~10 min) -> resultados\metricas\corrida_pendientes\logs\eval_test_con_tl.log
+[2026-10-17 06:00:37] [eval_test_con_tl] OK en 2.5 min
+[2026-10-17 06:00:37] [cabeza_sin_cbam_con_tl] Cabeza de pertenencia de la variante sin_cbam_con_tl (~2 min) -> resultados\metricas\corrida_pendientes\logs\cabeza_sin_cbam_con_tl.log
+[2026-10-17 06:01:11] [cabeza_sin_cbam_con_tl] OK en 0.6 min
+[2026-10-17 06:01:11] [eval_test_sin_cbam_con_tl] Evaluar en test la variante sin_cbam_con_tl, sin SAM (~10 min) -> resultados\metricas\corrida_pendientes\logs\eval_test_sin_cbam_con_tl.log
+[2026-10-17 06:03:48] [eval_test_sin_cbam_con_tl] OK en 2.6 min
+[2026-10-17 06:03:48] [resumen] Tablas con intervalos de confianza (C vs B y ablación) (~3 min) -> resultados\metricas\corrida_pendientes\logs\resumen.log
+[2026-10-17 06:05:05] [resumen] OK en 1.3 min
+[2026-10-17 06:05:05] FIN | 4.6 h | fallidos: ninguno

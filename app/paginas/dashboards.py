@@ -7,11 +7,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from rutas import METRICAS_DIR
+from rutas import FIGURAS_DIR, METRICAS_DIR
 
 COLOR_MODELO, COLOR_SAM = "#2B8CBE", "#9E9E9E"
 PLANOS = {"axial": "Axial", "coronal": "Coronal", "sagital": "Sagital"}
-COMANDO_EVALUACION = ("python -m src.evaluacion --plano todos --split test --nms-function src.deteccion_grid:nms_por_clase "
+COMANDO_EVALUACION = ("python -m src.evaluacion --plano todos --split test "
                       "--sam-checkpoint resultados/modelos/modelos_sam/sam_vit_b_01ec64.pth")
 
 
@@ -36,12 +36,21 @@ st.caption("Resultados sobre el conjunto de **test** (20 casos que no se usaron 
 evaluaciones = {p: leer_json(METRICAS_DIR / "evaluacion" / p / "metricas_test.json") for p in PLANOS}
 evaluaciones = {p: e for p, e in evaluaciones.items() if e is not None}
 
-resumen, entrenamiento, sam, latencia = st.tabs(["Resumen", "Entrenamiento", "Modelo vs SAM", "Latencia"])
+resumen, entrenamiento, sam, ablacion, latencia = st.tabs(
+    ["Resumen", "Entrenamiento", "Modelo vs SAM", "Ablación", "Latencia"])
 
-METRICAS_CONSIGNA = [("Clasificación F1", "classification_f1_macro"), ("Clasificación AUC", "classification_auc_macro"),
-                     ("Detección IoU", "bbox_mean_iou"), ("Detección mAP@0.50", "bbox_map50"),
-                     ("Detección mAP@[.50:.95]", "bbox_map50_95"), ("Segmentación Dice", "modelo_fragment_dice"),
-                     ("Segmentación IoU", "modelo_fragment_iou")]
+# Clasificación = pertenencia de cada fragmento a su hueso (evaluador actual). Las claves classification_* son las del
+# evaluador anterior (presencia de cada región en el corte) y solo se usan si la evaluación es de esa versión.
+METRICAS_CONSIGNA = [("Clasificación F1", ("pertenencia_f1_macro", "classification_f1_macro")),
+                     ("Clasificación AUC", ("pertenencia_auc_macro_ovr", "classification_auc_macro")),
+                     ("Detección IoU", ("bbox_mean_iou",)), ("Detección mAP@0.50", ("bbox_map50",)),
+                     ("Detección mAP@[.50:.95]", ("bbox_map50_95",)), ("Segmentación Dice", ("modelo_fragment_dice",)),
+                     ("Segmentación IoU", ("modelo_fragment_iou",))]
+
+
+def valor_y_objetivo(e, claves):
+    clave = next(c for c in claves if c in e)
+    return e[clave], e["targets"][clave]["minimum"]
 
 # ---------------------------------------------------------------------------------------------------------------
 with resumen:
@@ -57,19 +66,29 @@ with resumen:
         st.caption("Flecha verde: el valor supera el objetivo; roja: queda por debajo.")
         for fila in (METRICAS_CONSIGNA[:4], METRICAS_CONSIGNA[4:]):
             cols = st.columns(4)
-            for col, (nombre, clave) in zip(cols, fila):
-                valor, objetivo = evaluacion[clave], evaluacion["targets"][clave]["minimum"]
+            for col, (nombre, claves) in zip(cols, fila):
+                valor, objetivo = valor_y_objetivo(evaluacion, claves)
                 col.metric(nombre, f"{valor:.3f}", f"{valor - objetivo:+.3f} vs objetivo {objetivo:.2f}",
                            border=True)
+        if "pertenencia_f1_macro" in evaluacion:
+            st.caption("Clasificación: hueso asignado a cada fragmento real por el sistema completo (detección → "
+                       "decoder → cabeza de pertenencia); un fragmento que el sistema no encuentra cuenta como error. "
+                       f"Con la regla semántica del decoder, que es la que usa el frontend, el F1 es "
+                       f"{evaluacion['regla_semantica_f1_macro']:.3f}. Fragmentos encontrados (IoU ≥ 0.5): "
+                       f"{evaluacion['pertenencia_cobertura']:.1%}.")
         st.caption("Dice e IoU de segmentación son por fragmento 2D (cada fragmento real contra su mejor "
                    f"predicción en el corte). Por región anatómica, el Dice es {evaluacion['modelo_dice_macro']:.3f} "
                    f"y el IoU {evaluacion['modelo_iou_macro']:.3f}.")
+        confusion = FIGURAS_DIR / "evaluacion" / plano_eval / "pertenencia_confusion_test.png"
+        if confusion.is_file():
+            with st.expander("Matriz de confusión de la clasificación (pertenencia por fragmento)"):
+                st.image(str(confusion), width="stretch")
         if len(evaluaciones) > 1:
             st.subheader("Comparación de los tres modelos")
-            tabla = pd.DataFrame({PLANOS[p]: {nombre: e[clave] for nombre, clave in METRICAS_CONSIGNA}
+            tabla = pd.DataFrame({PLANOS[p]: {nombre: valor_y_objetivo(e, claves)[0] for nombre, claves in METRICAS_CONSIGNA}
                                   for p, e in evaluaciones.items()})
-            tabla.insert(0, "Objetivo", [evaluaciones[next(iter(evaluaciones))]["targets"][clave]["minimum"]
-                                         for _, clave in METRICAS_CONSIGNA])
+            tabla.insert(0, "Objetivo", [valor_y_objetivo(next(iter(evaluaciones.values())), claves)[1]
+                                         for _, claves in METRICAS_CONSIGNA])
             st.dataframe(tabla, width="stretch",
                          column_config={c: st.column_config.NumberColumn(format="%.3f") for c in tabla.columns})
 
@@ -132,6 +151,46 @@ with sam:
             st.write(f"En GPU, SAM tarda **{lat_sam['sam_ms_mean']:.0f} ms** por corte frente a "
                      f"**{lat_sam['pipeline_ms_mean']:.0f} ms** del pipeline propio completo "
                      f"({lat_sam['sam_ms_mean'] / lat_sam['pipeline_ms_mean']:.0f} veces más).")
+
+# ---------------------------------------------------------------------------------------------------------------
+with ablacion:
+    # src/resumen_ablacion.py --split test (lo corre src/correr_pendientes.py)
+    tabla_abl = leer_csv(METRICAS_DIR / "comparaciones" / "ablacion_tabla_test.csv")
+    difs_abl = leer_csv(METRICAS_DIR / "comparaciones" / "ablacion_test.csv")
+    c_vs_b = leer_csv(METRICAS_DIR / "comparaciones" / "c_vs_b_test.csv")
+    if tabla_abl is None and c_vs_b is None:
+        st.info("Aún no hay resultados de la ablación. Ejecuta `python -m src.correr_pendientes`.")
+    if tabla_abl is not None:
+        st.subheader("Ablación: CBAM y transfer learning")
+        st.caption("Plano axial, al final de la etapa B (mismos datos, semilla y épocas). Base: con CBAM y sin transfer "
+                   "learning. Transfer learning: backbone preentrenado como clasificador en Oxford-IIIT Pet (fotos en "
+                   "gris); detección, decoder y pertenencia desde cero.")
+        st.dataframe(tabla_abl.rename(columns={"modelo": "Modelo", "transfer_learning": "Transfer learning"}),
+                     hide_index=True, width="stretch",
+                     column_config={c: st.column_config.NumberColumn(format="%.3f")
+                                    for c in tabla_abl.columns if tabla_abl[c].dtype.kind == "f"})
+
+    def tabla_diferencias(t, grupo):
+        t = t[t["ic95_inf"].notna()].copy()
+        t["IC 95 %"] = [f"[{a:+.3f}, {b:+.3f}]" for a, b in zip(t["ic95_inf"], t["ic95_sup"])]
+        t["Lectura"] = ["mejora relevante" if r and d > 0 else "empeora" if s and d < 0 else
+                        "mejora pequeña" if s else "sin diferencia" for d, s, r in
+                        zip(t["diferencia"], t["significativa"], t["relevante"])]
+        return t[[grupo, "metrica", "referencia", "nuevo", "diferencia", "IC 95 %", "Lectura"]]
+
+    if difs_abl is not None:
+        st.markdown("**Diferencia de cada variante frente a la base**, con intervalo de confianza del 95 % (bootstrap "
+                    "pareado por paciente). Es relevante si el intervalo no incluye 0 y la diferencia supera 0.01.")
+        st.dataframe(tabla_diferencias(difs_abl, "variante"), hide_index=True, width="stretch",
+                     column_config={c: st.column_config.NumberColumn(format="%.3f")
+                                    for c in ("referencia", "nuevo", "diferencia")})
+    if c_vs_b is not None:
+        st.subheader("¿La etapa C mejora a la B?")
+        st.caption("Se decidió con validación que C no aporta lo suficiente para entrenarla en la ablación; aquí se "
+                   "muestra test solo como evidencia (diferencia = C − B).")
+        st.dataframe(tabla_diferencias(c_vs_b, "plano"), hide_index=True, width="stretch",
+                     column_config={c: st.column_config.NumberColumn(format="%.3f")
+                                    for c in ("referencia", "nuevo", "diferencia")})
 
 # ---------------------------------------------------------------------------------------------------------------
 with latencia:

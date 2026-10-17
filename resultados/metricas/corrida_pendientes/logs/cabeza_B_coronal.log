@@ -1,0 +1,44 @@
+D:\proyecto_analitica_corte2\.venv\Scripts\python.exe -u -m src.entrenar_pertenencia_planos --plano coronal --device cuda --checkpoint resultados\modelos\entrenamiento_multitarea_coronal\modelo_multitarea_coronal_B.pt --salida resultados\modelos\nms_pertenencia\cabeza_pertenencia_coronal_B.pt
+
+
+===== Etapa D | plano coronal | modelo_multitarea_coronal_B.pt | cuda =====
+[coronal_pos_train_25d] caché cargada: 14545 cortes
+[coronal_pos_val_25d] caché cargada: 987 cortes
+[coronal] precalculando f4: 3000 cortes de train y 987 de val
+  16/3000 cortes procesados
+  416/3000 cortes procesados
+  816/3000 cortes procesados
+  1216/3000 cortes procesados
+  1616/3000 cortes procesados
+  2016/3000 cortes procesados
+  2416/3000 cortes procesados
+  2816/3000 cortes procesados
+  16/987 cortes procesados
+  416/987 cortes procesados
+  816/987 cortes procesados
+[coronal] f4 listo en 59 s | instancias train 10042 (sacro, coxal izq., coxal der. = [2371, 3859, 3812]) | val 3109
+época  1 | train 0.2369 | val 0.0854 | F1 0.970 | AUC 0.998  *
+época  2 | train 0.0290 | val 0.0732 | F1 0.976 | AUC 0.999  *
+época  3 | train 0.0193 | val 0.0924 | F1 0.970 | AUC 0.998
+época  4 | train 0.0130 | val 0.0821 | F1 0.974 | AUC 0.999
+época  5 | train 0.0092 | val 0.0741 | F1 0.975 | AUC 0.999
+época  6 | train 0.0055 | val 0.0971 | F1 0.971 | AUC 0.998
+época  7 | train 0.0042 | val 0.0976 | F1 0.972 | AUC 0.999
+época  8 | train 0.0045 | val 0.0915 | F1 0.973 | AUC 0.999
+época  9 | train 0.0038 | val 0.0767 | F1 0.977 | AUC 0.999  *
+época 10 | train 0.0025 | val 0.0871 | F1 0.977 | AUC 0.999
+época 11 | train 0.0071 | val 0.0823 | F1 0.974 | AUC 0.999
+época 12 | train 0.0038 | val 0.0987 | F1 0.973 | AUC 0.999
+época 13 | train 0.0014 | val 0.0862 | F1 0.975 | AUC 0.999
+época 14 | train 0.0016 | val 0.0924 | F1 0.976 | AUC 0.999
+época 15 | train 0.0017 | val 0.0902 | F1 0.976 | AUC 0.999
+época 16 | train 0.0014 | val 0.0958 | F1 0.975 | AUC 0.999
+época 17 | train 0.0012 | val 0.0964 | F1 0.975 | AUC 0.999
+Sin mejora en val durante 8 épocas: se detiene.
+[coronal] mejor epoca 9: F1 val 0.977 | AUC val 0.999 | cabeza_pertenencia_coronal_B.pt guardada (1.3 min)
+
+Resumen etapa D:
+  plano  val_f1_macro_mascaras_reales  val_auc_macro_ovr  mejor_epoca
+coronal                         0.977              0.999            9
+
+Siguiente: python -m src.evaluacion --plano todos --split val --device cuda

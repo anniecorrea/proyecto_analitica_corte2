@@ -1,0 +1,42 @@
+D:\proyecto_analitica_corte2\.venv\Scripts\python.exe -u -m src.entrenar_pertenencia_planos --plano axial --device cuda --checkpoint resultados\modelos\entrenamiento_multitarea_axial_ablacion_sin_cbam\modelo_multitarea_axial.pt --salida resultados\modelos\nms_pertenencia\cabeza_pertenencia_axial_ablacion_sin_cbam.pt
+
+
+===== Etapa D | plano axial | modelo_multitarea_axial.pt | cuda =====
+[axial_pos_train_25d] caché cargada: 18072 cortes
+[axial_pos_val_25d] caché cargada: 1265 cortes
+[axial] precalculando f4: 3000 cortes de train y 1265 de val
+  16/3000 cortes procesados
+  416/3000 cortes procesados
+  816/3000 cortes procesados
+  1216/3000 cortes procesados
+  1616/3000 cortes procesados
+  2016/3000 cortes procesados
+  2416/3000 cortes procesados
+  2816/3000 cortes procesados
+  16/1265 cortes procesados
+  416/1265 cortes procesados
+  816/1265 cortes procesados
+  1216/1265 cortes procesados
+[axial] f4 listo en 22 s | instancias train 10057 (sacro, coxal izq., coxal der. = [2489, 3766, 3802]) | val 3947
+época  1 | train 0.2727 | val 0.0895 | F1 0.974 | AUC 0.999  *
+época  2 | train 0.0193 | val 0.0664 | F1 0.976 | AUC 0.999  *
+época  3 | train 0.0096 | val 0.0689 | F1 0.977 | AUC 0.999  *
+época  4 | train 0.0052 | val 0.0659 | F1 0.976 | AUC 0.999
+época  5 | train 0.0039 | val 0.0693 | F1 0.979 | AUC 0.999  *
+época  6 | train 0.0025 | val 0.0723 | F1 0.982 | AUC 0.999  *
+época  7 | train 0.0016 | val 0.0743 | F1 0.979 | AUC 0.999
+época  8 | train 0.0010 | val 0.0750 | F1 0.980 | AUC 0.999
+época  9 | train 0.0007 | val 0.0796 | F1 0.980 | AUC 0.999
+época 10 | train 0.0008 | val 0.0795 | F1 0.982 | AUC 0.999
+época 11 | train 0.0005 | val 0.0802 | F1 0.979 | AUC 0.999
+época 12 | train 0.0004 | val 0.0818 | F1 0.980 | AUC 0.999
+época 13 | train 0.0003 | val 0.0836 | F1 0.980 | AUC 0.999
+época 14 | train 0.0005 | val 0.0864 | F1 0.981 | AUC 0.999
+Sin mejora en val durante 8 épocas: se detiene.
+[axial] mejor epoca 6: F1 val 0.982 | AUC val 0.999 | cabeza_pertenencia_axial_ablacion_sin_cbam.pt guardada (0.7 min)
+
+Resumen etapa D:
+plano  val_f1_macro_mascaras_reales  val_auc_macro_ovr  mejor_epoca
+axial                         0.982              0.999            6
+
+Siguiente: python -m src.evaluacion --plano todos --split val --device cuda

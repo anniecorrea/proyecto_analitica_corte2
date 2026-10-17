@@ -1,0 +1,64 @@
+D:\proyecto_analitica_corte2\.venv\Scripts\python.exe -u -m src.preentrenar_backbone_pets --epochs 60 --rehacer
+
+Oxford-IIIT Pet: 3680 de entrenamiento, 3669 de validación, 37 clases | cuda
+época 01/60 | pérdida 3.578 | val 3.586 | exactitud 0.068 *
+época 02/60 | pérdida 3.355 | val 3.393 | exactitud 0.100 *
+época 03/60 | pérdida 3.193 | val 3.306 | exactitud 0.110 *
+época 04/60 | pérdida 3.077 | val 3.691 | exactitud 0.057
+época 05/60 | pérdida 2.981 | val 5.257 | exactitud 0.070
+época 06/60 | pérdida 2.935 | val 3.448 | exactitud 0.123 *
+época 07/60 | pérdida 2.798 | val 4.654 | exactitud 0.090
+época 08/60 | pérdida 2.688 | val 3.196 | exactitud 0.129 *
+época 09/60 | pérdida 2.585 | val 7.182 | exactitud 0.054
+época 10/60 | pérdida 2.504 | val 3.509 | exactitud 0.123
+época 11/60 | pérdida 2.443 | val 4.019 | exactitud 0.132 *
+época 12/60 | pérdida 2.334 | val 3.214 | exactitud 0.163 *
+época 13/60 | pérdida 2.275 | val 4.140 | exactitud 0.145
+época 14/60 | pérdida 2.194 | val 2.960 | exactitud 0.222 *
+época 15/60 | pérdida 2.102 | val 3.084 | exactitud 0.223 *
+época 16/60 | pérdida 2.035 | val 4.042 | exactitud 0.133
+época 17/60 | pérdida 1.944 | val 2.455 | exactitud 0.292 *
+época 18/60 | pérdida 1.883 | val 2.122 | exactitud 0.383 *
+época 19/60 | pérdida 1.817 | val 2.525 | exactitud 0.293
+época 20/60 | pérdida 1.756 | val 2.279 | exactitud 0.355
+época 21/60 | pérdida 1.703 | val 2.438 | exactitud 0.334
+época 22/60 | pérdida 1.659 | val 1.998 | exactitud 0.414 *
+época 23/60 | pérdida 1.559 | val 2.067 | exactitud 0.381
+época 24/60 | pérdida 1.511 | val 1.822 | exactitud 0.467 *
+época 25/60 | pérdida 1.482 | val 2.015 | exactitud 0.430
+época 26/60 | pérdida 1.430 | val 1.943 | exactitud 0.430
+época 27/60 | pérdida 1.397 | val 2.641 | exactitud 0.306
+época 28/60 | pérdida 1.333 | val 2.101 | exactitud 0.392
+época 29/60 | pérdida 1.303 | val 2.161 | exactitud 0.386
+época 30/60 | pérdida 1.250 | val 1.741 | exactitud 0.477 *
+época 31/60 | pérdida 1.202 | val 1.759 | exactitud 0.492 *
+época 32/60 | pérdida 1.174 | val 2.014 | exactitud 0.436
+época 33/60 | pérdida 1.145 | val 1.686 | exactitud 0.511 *
+época 34/60 | pérdida 1.111 | val 1.909 | exactitud 0.468
+época 35/60 | pérdida 1.090 | val 1.816 | exactitud 0.489
+época 36/60 | pérdida 1.075 | val 1.493 | exactitud 0.571 *
+época 37/60 | pérdida 1.041 | val 1.499 | exactitud 0.575 *
+época 38/60 | pérdida 1.005 | val 1.557 | exactitud 0.557
+época 39/60 | pérdida 1.003 | val 1.495 | exactitud 0.577 *
+época 40/60 | pérdida 0.966 | val 1.422 | exactitud 0.602 *
+época 41/60 | pérdida 0.958 | val 1.413 | exactitud 0.602 *
+época 42/60 | pérdida 0.941 | val 1.467 | exactitud 0.585
+época 43/60 | pérdida 0.927 | val 1.431 | exactitud 0.599
+época 44/60 | pérdida 0.915 | val 1.442 | exactitud 0.605 *
+época 45/60 | pérdida 0.909 | val 1.432 | exactitud 0.598
+época 46/60 | pérdida 0.902 | val 1.343 | exactitud 0.629 *
+época 47/60 | pérdida 0.900 | val 1.363 | exactitud 0.627
+época 48/60 | pérdida 0.880 | val 1.346 | exactitud 0.635 *
+época 49/60 | pérdida 0.881 | val 1.365 | exactitud 0.628
+época 50/60 | pérdida 0.875 | val 1.362 | exactitud 0.635 *
+época 51/60 | pérdida 0.869 | val 1.349 | exactitud 0.631
+época 52/60 | pérdida 0.871 | val 1.325 | exactitud 0.635 *
+época 53/60 | pérdida 0.868 | val 1.341 | exactitud 0.633
+época 54/60 | pérdida 0.866 | val 1.327 | exactitud 0.639 *
+época 55/60 | pérdida 0.861 | val 1.335 | exactitud 0.638
+época 56/60 | pérdida 0.860 | val 1.331 | exactitud 0.637
+época 57/60 | pérdida 0.856 | val 1.323 | exactitud 0.638
+época 58/60 | pérdida 0.858 | val 1.327 | exactitud 0.639
+época 59/60 | pérdida 0.859 | val 1.324 | exactitud 0.644 *
+época 60/60 | pérdida 0.852 | val 1.324 | exactitud 0.642
+Listo: exactitud 0.644 en 5.4 min -> resultados\modelos\backbone_pets\fundidora_plus_pets.pt

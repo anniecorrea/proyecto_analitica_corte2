@@ -1,0 +1,125 @@
+D:\proyecto_analitica_corte2\.venv\Scripts\python.exe -u -m src.evaluacion --plano todos --split test --sam-checkpoint resultados\modelos\modelos_sam\sam_vit_b_01ec64.pth --device cuda
+
+
+===== Modelo axial (modelo_multitarea_axial.pt) | split=test =====
+[axial_pos_test_25d] caché cargada: 4897 cortes
+Evaluacion terminada: 4897 cortes de 20 casos.
+Metricas: D:\proyecto_analitica_corte2\resultados\metricas\evaluacion\axial\metricas_test.json
+Latencia (batch=1, cuda): media 22.8 ms | p50 22.2 | p95 29.3 ms/corte.
+                                           Metrica Objetivo Modelo   SAM Cumple
+           Pertenencia F1 macro (sistema completo)  >= 0.85  0.886     -     si
+Pertenencia AUC macro OvR (fragmentos emparejados)  >= 0.85  1.000     -     si
+              Cobertura de fragmentos (IoU >= 0.5)           0.815     -       
+  Pertenencia F1 con mascaras reales (diagnostico)           0.988     -       
+   Regla semantica F1 (baseline, sistema completo)           0.888     -       
+    Presencia de region F1 (detector, diagnostico)           0.973     -       
+                            Deteccion IoU promedio  >= 0.65  0.855     -     si
+                                Deteccion mAP@0.50  >= 0.65  0.933     -     si
+                         Deteccion mAP@[0.50:0.95]  >= 0.40  0.692     -     si
+                   Segmentacion Dice por fragmento  >= 0.85  0.793     -     no
+                    Segmentacion IoU por fragmento  >= 0.70  0.704     -     si
+              Dice semantico macro (modelo vs SAM)           0.962 0.803       
+               IoU semantico macro (modelo vs SAM)           0.927 0.672       
+    Dice semantico macro del decoder (diagnostico)           0.966     -       
+
+Pertenencia: cabeza vs reglas base (F1 y exactitud sobre TODOS los fragmentos reales)
+                modo                  metodo  n_instancias  n_sin_clase  exactitud  f1_macro  f1_sacro  f1_coxal_izquierdo  f1_coxal_derecho  auc_macro_ovr
+instancias_predichas      cabeza_pertenencia         16041         2974      0.810     0.886     0.837               0.916             0.904          1.000
+instancias_predichas regla_mayoria_semantica         16041         2974      0.813     0.888     0.838               0.920             0.907            NaN
+instancias_predichas    regla_caja_detectada         16041         3031      0.806     0.882     0.829               0.916             0.902            NaN
+     mascaras_reales      cabeza_pertenencia         16041            0      0.989     0.988     0.984               0.991             0.991          0.999
+     mascaras_reales regla_mayoria_semantica         16041           61      0.990     0.991     0.987               0.995             0.993            NaN
+     mascaras_reales    regla_caja_detectada         16041          180      0.971     0.974     0.958               0.987             0.977            NaN
+
+Pertenencia por tamano del fragmento
+tamano_fragmento  n_fragmentos_reales  cobertura  exactitud_cabeza_mascara_real  exactitud_cabeza_emparejados  exactitud_decoder_emparejados  n_instancias_predichas  frac_instancias_sin_emparejar  frac_conflicto_cabeza_decoder
+         <100 px                 2546      0.571                          0.959                         0.979                          0.988                   13597                          0.883                          0.082
+      100-399 px                 5215      0.798                          0.988                         0.990                          0.998                   10330                          0.508                          0.013
+     400-1599 px                 8065      0.904                          0.999                         0.999                          0.999                    7187                          0.117                          0.000
+       >=1600 px                  215      0.721                          1.000                         1.000                          1.000                      46                          0.000                          0.000
+
+Conflictos cabeza vs decoder: 1247 de 31160 instancias (4.0%). En los 54 emparejados con un fragmento real acierta la cabeza 7.4% y el decoder 92.6%.
+
+===== Modelo coronal (modelo_multitarea_coronal.pt) | split=test =====
+[coronal_pos_test_25d] caché cargada: 3817 cortes
+Evaluacion terminada: 3817 cortes de 20 casos.
+Metricas: D:\proyecto_analitica_corte2\resultados\metricas\evaluacion\coronal\metricas_test.json
+Latencia (batch=1, cuda): media 20.8 ms | p50 19.9 | p95 29.3 ms/corte.
+                                           Metrica Objetivo Modelo   SAM Cumple
+           Pertenencia F1 macro (sistema completo)  >= 0.85  0.819     -     no
+Pertenencia AUC macro OvR (fragmentos emparejados)  >= 0.85  1.000     -     si
+              Cobertura de fragmentos (IoU >= 0.5)           0.712     -       
+  Pertenencia F1 con mascaras reales (diagnostico)           0.984     -       
+   Regla semantica F1 (baseline, sistema completo)           0.823     -       
+    Presencia de region F1 (detector, diagnostico)           0.972     -       
+                            Deteccion IoU promedio  >= 0.65  0.787     -     si
+                                Deteccion mAP@0.50  >= 0.65  0.866     -     si
+                         Deteccion mAP@[0.50:0.95]  >= 0.40  0.555     -     si
+                   Segmentacion Dice por fragmento  >= 0.85  0.739     -     no
+                    Segmentacion IoU por fragmento  >= 0.70  0.636     -     no
+              Dice semantico macro (modelo vs SAM)           0.953 0.756       
+               IoU semantico macro (modelo vs SAM)           0.910 0.608       
+    Dice semantico macro del decoder (diagnostico)           0.957     -       
+
+Pertenencia: cabeza vs reglas base (F1 y exactitud sobre TODOS los fragmentos reales)
+                modo                  metodo  n_instancias  n_sin_clase  exactitud  f1_macro  f1_sacro  f1_coxal_izquierdo  f1_coxal_derecho  auc_macro_ovr
+instancias_predichas      cabeza_pertenencia         12843         3693      0.709     0.819     0.765               0.812             0.880          1.000
+instancias_predichas regla_mayoria_semantica         12843         3693      0.712     0.823     0.772               0.814             0.884            NaN
+instancias_predichas    regla_caja_detectada         12843         3823      0.695     0.808     0.756               0.801             0.869            NaN
+     mascaras_reales      cabeza_pertenencia         12843            0      0.985     0.984     0.978               0.988             0.985          0.999
+     mascaras_reales regla_mayoria_semantica         12843           88      0.989     0.992     0.987               0.993             0.995            NaN
+     mascaras_reales    regla_caja_detectada         12843          366      0.942     0.953     0.937               0.963             0.960            NaN
+
+Pertenencia por tamano del fragmento
+tamano_fragmento  n_fragmentos_reales  cobertura  exactitud_cabeza_mascara_real  exactitud_cabeza_emparejados  exactitud_decoder_emparejados  n_instancias_predichas  frac_instancias_sin_emparejar  frac_conflicto_cabeza_decoder
+         <100 px                 2328      0.513                          0.937                         0.986                          0.998                   11812                          0.888                          0.078
+      100-399 px                 3666      0.667                          0.992                         0.995                          1.000                    8219                          0.673                          0.008
+     400-1599 px                 5763      0.842                          0.997                         0.997                          1.000                    7454                          0.337                          0.002
+       >=1600 px                 1086      0.604                          1.000                         1.000                          1.000                     200                          0.010                          0.000
+
+Conflictos cabeza vs decoder: 1002 de 27685 instancias (3.6%). En los 47 emparejados con un fragmento real acierta la cabeza 4.3% y el decoder 95.7%.
+
+===== Modelo sagital (modelo_multitarea_sagital.pt) | split=test =====
+[sagital_pos_test_25d] caché cargada: 6658 cortes
+Evaluacion terminada: 6658 cortes de 20 casos.
+Metricas: D:\proyecto_analitica_corte2\resultados\metricas\evaluacion\sagital\metricas_test.json
+Latencia (batch=1, cuda): media 20.5 ms | p50 19.2 | p95 27.8 ms/corte.
+                                           Metrica Objetivo Modelo   SAM Cumple
+           Pertenencia F1 macro (sistema completo)  >= 0.85  0.888     -     si
+Pertenencia AUC macro OvR (fragmentos emparejados)  >= 0.85  1.000     -     si
+              Cobertura de fragmentos (IoU >= 0.5)           0.810     -       
+  Pertenencia F1 con mascaras reales (diagnostico)           0.979     -       
+   Regla semantica F1 (baseline, sistema completo)           0.894     -       
+    Presencia de region F1 (detector, diagnostico)           0.981     -       
+                            Deteccion IoU promedio  >= 0.65  0.852     -     si
+                                Deteccion mAP@0.50  >= 0.65  0.918     -     si
+                         Deteccion mAP@[0.50:0.95]  >= 0.40  0.711     -     si
+                   Segmentacion Dice por fragmento  >= 0.85  0.790     -     no
+                    Segmentacion IoU por fragmento  >= 0.70  0.715     -     si
+              Dice semantico macro (modelo vs SAM)           0.954 0.806       
+               IoU semantico macro (modelo vs SAM)           0.912 0.674       
+    Dice semantico macro del decoder (diagnostico)           0.961     -       
+
+Pertenencia: cabeza vs reglas base (F1 y exactitud sobre TODOS los fragmentos reales)
+                modo                  metodo  n_instancias  n_sin_clase  exactitud  f1_macro  f1_sacro  f1_coxal_izquierdo  f1_coxal_derecho  auc_macro_ovr
+instancias_predichas      cabeza_pertenencia         11721         2231      0.803     0.888     0.903               0.867             0.895          1.000
+instancias_predichas regla_mayoria_semantica         11721         2231      0.808     0.894     0.906               0.873             0.901            NaN
+instancias_predichas    regla_caja_detectada         11721         2249      0.740     0.811     0.750               0.827             0.857            NaN
+     mascaras_reales      cabeza_pertenencia         11721            0      0.979     0.979     0.979               0.978             0.980          0.999
+     mascaras_reales regla_mayoria_semantica         11721           60      0.986     0.988     0.987               0.990             0.988            NaN
+     mascaras_reales    regla_caja_detectada         11721           87      0.907     0.902     0.833               0.940             0.932            NaN
+
+Pertenencia por tamano del fragmento
+tamano_fragmento  n_fragmentos_reales  cobertura  exactitud_cabeza_mascara_real  exactitud_cabeza_emparejados  exactitud_decoder_emparejados  n_instancias_predichas  frac_instancias_sin_emparejar  frac_conflicto_cabeza_decoder
+         <100 px                 1522      0.428                          0.900                         0.931                          0.975                    7271                          0.899                          0.137
+      100-399 px                 3003      0.776                          0.978                         0.987                          0.997                    5232                          0.522                          0.028
+     400-1599 px                 5233      0.901                          0.997                         0.999                          1.000                    5995                          0.208                          0.008
+       >=1600 px                 1963      0.915                          0.996                         0.999                          1.000                    1652                          0.091                          0.000
+
+Conflictos cabeza vs decoder: 1194 de 20150 instancias (5.9%). En los 79 emparejados con un fragmento real acierta la cabeza 10.1% y el decoder 87.3%.
+
+Resumen de los tres planos: D:\proyecto_analitica_corte2\resultados\metricas\evaluacion\resumen_planos_test.csv
+  plano  bbox_map50  bbox_mean_iou  modelo_fragment_dice  modelo_fragment_iou  pertenencia_f1_macro  pertenencia_auc_macro_ovr  pertenencia_cobertura
+  axial    0.933106       0.854906              0.792692             0.704309              0.885573                   0.999693               0.814600
+coronal    0.866118       0.787043              0.738810             0.635898              0.818971                   0.999943               0.712450
+sagital    0.918454       0.851887              0.789548             0.714633              0.888157                   0.999578               0.809658

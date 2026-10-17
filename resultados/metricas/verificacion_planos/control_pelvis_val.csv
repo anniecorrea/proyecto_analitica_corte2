@@ -1,0 +1,46 @@
+caso,plano,estudio,largo_estudio_mm,esperado,decision,ok,racha_mm,racha_cortes,cortes_activos,n_cortes,fragmentos_sin_control,segundos
+035,axial,completo,298.4,presente,presente,True,257.6,322,322,373,3,42.4
+035,axial,sin_pelvis_antes,21.6,no presente,no presente,True,21.6,27,27,27,0,0.6
+035,axial,sin_pelvis_despues,40.8,no presente,no presente,True,0.0,0,0,51,0,0.7
+035,coronal,completo,298.4,presente,presente,True,157.6,195,195,279,3,35.0
+035,coronal,sin_pelvis_antes,21.6,no presente,no presente,True,2.4,3,5,279,0,1.8
+035,coronal,sin_pelvis_despues,40.8,no presente,no presente,True,8.9,11,24,279,0,2.2
+035,sagital,completo,298.4,presente,presente,True,273.9,339,339,512,4,38.7
+035,sagital,sin_pelvis_antes,21.6,no presente,no presente,True,10.5,13,40,512,1,3.2
+035,sagital,sin_pelvis_despues,40.8,no presente,no presente,True,8.1,10,43,512,1,3.4
+037,axial,completo,335.0,presente,presente,True,218.3,217,219,333,3,35.3
+037,axial,sin_pelvis_antes,80.5,no presente,no presente,True,0.0,0,0,80,0,1.3
+037,axial,sin_pelvis_despues,30.2,no presente,no presente,True,0.0,0,0,30,0,0.5
+037,coronal,completo,335.0,presente,presente,True,134.4,172,214,512,5,35.5
+037,coronal,sin_pelvis_antes,80.5,no presente,no presente,True,44.5,57,96,512,0,3.7
+037,coronal,sin_pelvis_despues,30.2,no presente,no presente,True,7.8,10,31,512,0,2.6
+037,sagital,completo,335.0,presente,presente,True,232.0,297,354,512,5,40.1
+037,sagital,sin_pelvis_antes,80.5,no presente,no presente,True,17.2,22,134,512,5,5.3
+037,sagital,sin_pelvis_despues,30.2,no presente,no presente,True,13.3,17,38,512,0,3.5
+067,axial,completo,295.2,presente,presente,True,200.8,251,251,369,3,30.3
+067,axial,sin_pelvis_antes,44.0,no presente,no presente,True,0.0,0,0,55,0,0.7
+067,axial,sin_pelvis_despues,50.4,no presente,no presente,True,0.0,0,0,63,0,0.6
+067,coronal,completo,295.2,presente,presente,True,151.9,168,168,231,4,26.4
+067,coronal,sin_pelvis_antes,44.0,no presente,no presente,True,2.7,3,3,231,0,1.5
+067,coronal,sin_pelvis_despues,50.4,no presente,no presente,True,32.5,36,54,231,1,1.8
+067,sagital,completo,295.2,presente,presente,True,273.9,303,304,512,4,28.8
+067,sagital,sin_pelvis_antes,44.0,no presente,no presente,True,11.8,13,48,512,1,3.2
+067,sagital,sin_pelvis_despues,50.4,no presente,no presente,True,5.4,6,35,512,1,2.7
+071,axial,completo,255.2,presente,presente,True,220.0,275,275,319,4,26.7
+071,axial,sin_pelvis_antes,24.8,no presente,no presente,True,7.2,9,9,31,0,0.5
+071,axial,sin_pelvis_despues,17.6,no presente,no presente,True,0.0,0,0,22,0,0.2
+071,coronal,completo,255.2,presente,presente,True,163.6,176,179,209,4,22.0
+071,coronal,sin_pelvis_antes,24.8,no presente,no presente,True,39.0,42,43,209,0,1.5
+071,coronal,sin_pelvis_despues,17.6,no presente,no presente,True,21.4,23,28,209,0,1.3
+071,sagital,completo,255.2,presente,presente,True,275.2,296,299,351,3,23.8
+071,sagital,sin_pelvis_antes,24.8,no presente,no presente,True,11.2,12,14,351,0,2.1
+071,sagital,sin_pelvis_despues,17.6,no presente,no presente,True,5.6,6,10,351,0,2.0
+079,axial,completo,268.0,presente,presente,True,233.0,233,233,268,3,31.3
+079,axial,sin_pelvis_antes,17.0,no presente,no presente,True,0.0,0,0,17,0,0.4
+079,axial,sin_pelvis_despues,18.0,no presente,no presente,True,0.0,0,0,18,0,0.2
+079,coronal,completo,268.0,presente,presente,True,104.7,151,237,275,7,31.4
+079,coronal,sin_pelvis_antes,17.0,no presente,no presente,True,2.1,3,4,275,0,1.6
+079,coronal,sin_pelvis_despues,18.0,no presente,no presente,True,4.9,7,12,275,0,1.6
+079,sagital,completo,268.0,presente,presente,True,149.8,216,340,471,5,32.3
+079,sagital,sin_pelvis_antes,17.0,no presente,no presente,True,3.5,5,11,471,0,2.9
+079,sagital,sin_pelvis_despues,18.0,no presente,no presente,True,6.9,10,21,471,0,2.5

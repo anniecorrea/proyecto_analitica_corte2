@@ -1,0 +1,40 @@
+[2026-10-17 03:01:16] ABLACIÓN sin_cbam | CBAM False | transfer learning False | etapas ['A_deteccion', 'B_decoder'] | plano axial | completo
+[2026-10-17 03:01:16] ==================== PLANO AXIAL (completo) ====================
+[2026-10-17 03:01:16] manifiestos axial: test: 4897 pos, 1698 neg | train: 18072 pos, 5698 neg | val: 1265 pos, 394 neg
+[2026-10-17 03:01:16] axial: cortes por construir en caché ~0 (~0.0 GB) | positivos train 18072, negativos train 5698
+[2026-10-17 03:01:16] [axial_pos_train_25d] caché cargada: 18072 cortes
+[2026-10-17 03:01:23] [axial_pos_val_25d] caché cargada: 1265 cortes
+[2026-10-17 03:01:23] [axial_neg_train_25d] caché cargada: 5698 cortes
+[2026-10-17 03:01:26] [axial_neg_val_25d] caché cargada: 394 cortes
+[2026-10-17 03:01:27] axial: train 23770 cortes (18072 pos + 5698 neg), 1485 iteraciones/época | val 1265 pos + 394 neg | batch (16, 3, 256, 256) | carga de un batch 534 ms
+[2026-10-17 03:01:28] === Etapa A_deteccion | entrena ['backbone', 'cbam', 'det_head'] | w_det=1.0 w_seg=0.0 | priors=gt | 10 épocas x 1485 iteraciones ===
+[2026-10-17 03:08:04] [A_deteccion] ép 01/10 | train total=1.2223 | val mAP50=0.799 IoU=0.742 | vacíos que pasan=0.119 (umbral 0.85, recall pelvis 0.991) | sel=0.8263 | 379s (datos 83%) *
+[2026-10-17 03:09:26] [A_deteccion] ép 02/10 | train total=0.6280 | val mAP50=0.843 IoU=0.805 | vacíos que pasan=0.079 (umbral 0.87, recall pelvis 0.992) | sel=0.8693 | 70s (datos 25%) *
+[2026-10-17 03:10:48] [A_deteccion] ép 03/10 | train total=0.4749 | val mAP50=0.887 IoU=0.813 | vacíos que pasan=0.066 (umbral 0.83, recall pelvis 0.991) | sel=0.9026 | 70s (datos 25%) *
+[2026-10-17 03:12:11] [A_deteccion] ép 04/10 | train total=0.3988 | val mAP50=0.890 IoU=0.828 | vacíos que pasan=0.074 (umbral 0.70, recall pelvis 0.991) | sel=0.9024 | 71s (datos 25%)
+[2026-10-17 03:13:35] [A_deteccion] ép 05/10 | train total=0.3455 | val mAP50=0.898 IoU=0.831 | vacíos que pasan=0.091 (umbral 0.78, recall pelvis 0.991) | sel=0.9015 | 71s (datos 25%)
+[2026-10-17 03:14:58] [A_deteccion] ép 06/10 | train total=0.2987 | val mAP50=0.895 IoU=0.839 | vacíos que pasan=0.023 (umbral 0.90, recall pelvis 0.991) | sel=0.9222 | 71s (datos 25%) *
+[2026-10-17 03:16:21] [A_deteccion] ép 07/10 | train total=0.2544 | val mAP50=0.900 IoU=0.841 | vacíos que pasan=0.041 (umbral 0.89, recall pelvis 0.991) | sel=0.9200 | 71s (datos 25%)
+[2026-10-17 03:17:45] [A_deteccion] ép 08/10 | train total=0.2194 | val mAP50=0.903 IoU=0.844 | vacíos que pasan=0.053 (umbral 0.74, recall pelvis 0.991) | sel=0.9175 | 72s (datos 25%)
+[2026-10-17 03:19:08] [A_deteccion] ép 09/10 | train total=0.1912 | val mAP50=0.910 IoU=0.846 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9245 | 72s (datos 25%) *
+[2026-10-17 03:20:31] [A_deteccion] ép 10/10 | train total=0.1756 | val mAP50=0.909 IoU=0.846 | vacíos que pasan=0.048 (umbral 0.76, recall pelvis 0.991) | sel=0.9234 | 71s (datos 25%)
+[2026-10-17 03:20:31] Etapa A_deteccion: mejor score 0.9245 -> best_A_deteccion.pth
+[2026-10-17 03:20:31] === Etapa B_decoder | entrena ['seg_decoder'] | w_det=0.0 w_seg=1.0 | priors=gt_jitter | 10 épocas x 1485 iteraciones ===
+[2026-10-17 03:24:29] [B_decoder] ép 01/10 | train total=0.2685 | val mAP50=0.910 IoU=0.846 | Dice gt=0.881 pred=0.879 | frag@.5 gt=0.57 pred=0.58 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.8806 | 211s (datos 26%) *
+[2026-10-17 03:28:23] [B_decoder] ép 02/10 | train total=0.0207 | val mAP50=0.910 IoU=0.846 | Dice gt=0.932 pred=0.929 | frag@.5 gt=0.61 pred=0.60 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9323 | 208s (datos 26%) *
+[2026-10-17 03:32:18] [B_decoder] ép 03/10 | train total=0.0179 | val mAP50=0.910 IoU=0.846 | Dice gt=0.939 pred=0.935 | frag@.5 gt=0.62 pred=0.62 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9390 | 209s (datos 26%) *
+[2026-10-17 03:36:13] [B_decoder] ép 04/10 | train total=0.0133 | val mAP50=0.910 IoU=0.846 | Dice gt=0.946 pred=0.943 | frag@.5 gt=0.68 pred=0.66 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9464 | 209s (datos 26%) *
+[2026-10-17 03:40:07] [B_decoder] ép 05/10 | train total=0.0107 | val mAP50=0.910 IoU=0.846 | Dice gt=0.952 pred=0.949 | frag@.5 gt=0.73 pred=0.72 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9519 | 208s (datos 26%) *
+[2026-10-17 03:44:01] [B_decoder] ép 06/10 | train total=0.0095 | val mAP50=0.910 IoU=0.846 | Dice gt=0.939 pred=0.934 | frag@.5 gt=0.64 pred=0.61 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9390 | 208s (datos 26%)
+[2026-10-17 03:47:55] [B_decoder] ép 07/10 | train total=0.0080 | val mAP50=0.910 IoU=0.846 | Dice gt=0.957 pred=0.954 | frag@.5 gt=0.72 pred=0.71 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9573 | 208s (datos 26%) *
+[2026-10-17 03:51:50] [B_decoder] ép 08/10 | train total=0.0067 | val mAP50=0.910 IoU=0.846 | Dice gt=0.959 pred=0.956 | frag@.5 gt=0.74 pred=0.72 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9590 | 209s (datos 26%) *
+[2026-10-17 03:55:45] [B_decoder] ép 09/10 | train total=0.0057 | val mAP50=0.910 IoU=0.846 | Dice gt=0.960 pred=0.958 | frag@.5 gt=0.71 pred=0.71 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9601 | 209s (datos 26%) *
+[2026-10-17 03:59:39] [B_decoder] ép 10/10 | train total=0.0052 | val mAP50=0.910 IoU=0.846 | Dice gt=0.960 pred=0.958 | frag@.5 gt=0.73 pred=0.73 | vacíos que pasan=0.046 (umbral 0.78, recall pelvis 0.991) | sel=0.9603 | 208s (datos 26%) *
+[2026-10-17 03:59:39] Etapa B_decoder: mejor score 0.9603 -> best_B_decoder.pth
+[2026-10-17 03:59:40] [axial] guardado: D:\proyecto_analitica_corte2\resultados\modelos\entrenamiento_multitarea_axial_ablacion_sin_cbam\modelo_multitarea_axial.pt (10.0 MB) | salió de B_decoder época 10
+[2026-10-17 03:59:40] [axial] comprobación OK: el modelo reconstruido coincide con el checkpoint
+[2026-10-17 04:00:14] [axial] figura guardada: D:\proyecto_analitica_corte2\resultados\figuras\entrenamiento_multitarea_axial_ablacion_sin_cbam\vis_train_spread.png
+[2026-10-17 04:00:16] [axial] figura guardada: D:\proyecto_analitica_corte2\resultados\figuras\entrenamiento_multitarea_axial_ablacion_sin_cbam\vis_train_fragments.png
+[2026-10-17 04:00:17] [axial] figura guardada: D:\proyecto_analitica_corte2\resultados\figuras\entrenamiento_multitarea_axial_ablacion_sin_cbam\vis_val_spread.png
+[2026-10-17 04:00:19] [axial] figura guardada: D:\proyecto_analitica_corte2\resultados\figuras\entrenamiento_multitarea_axial_ablacion_sin_cbam\vis_val_fragments.png
+[2026-10-17 04:00:19] [axial] listo en 59.1 min | mAP50 0.910 | Dice(pred) 0.958 | vacíos que pasan 0.04568527918781726

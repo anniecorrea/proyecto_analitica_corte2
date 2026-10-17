@@ -1,0 +1,89 @@
+{
+  "split": "test",
+  "plano": "axial",
+  "checkpoint": "resultados/modelos/entrenamiento_multitarea_axial_ablacion_sin_cbam/modelo_multitarea_axial.pt",
+  "checkpoint_stage": "B_decoder",
+  "device": "cuda",
+  "n_slices": 4897,
+  "n_cases": 20,
+  "mean_inference_ms_per_slice_batched": 18.543447743532724,
+  "cls_threshold": 0.5,
+  "pipeline": "src.pipeline_pengwin:inferir_cortes",
+  "score_thresh": 0.05,
+  "nms_iou": 0.5,
+  "max_det_per_class": 1,
+  "umbral_corte": null,
+  "cabeza_pertenencia": "resultados/modelos/nms_pertenencia/cabeza_pertenencia_axial_ablacion_sin_cbam.pt",
+  "cabeza_tronco_sha256_16": "7abf51a1c559ccf7",
+  "evaluated_slices_note": "solo cortes positivos del manifiesto (con al menos una region GT)",
+  "n_ground_truth_fragments": 16041,
+  "modelo_fragment_dice": 0.783494590299693,
+  "modelo_fragment_iou": 0.6940222844915647,
+  "nms_function": "src.deteccion_grid:nms_por_clase",
+  "sam": "not_requested",
+  "datos": "cache de cortes de Entrenamiento_multitarea_planos.ipynb (mismo preprocesamiento del entrenamiento)",
+  "datos_iguales_al_entrenamiento": true,
+  "diferencias_datos": [],
+  "linea_media_sagital": null,
+  "presencia_region_f1_macro": 0.9734819355218916,
+  "presencia_region_f1_micro": 0.9771059349074664,
+  "presencia_region_auc_macro": 0.9809974804364433,
+  "pertenencia_n_fragmentos": 16041,
+  "pertenencia_cobertura": 0.8052490493111402,
+  "pertenencia_f1_macro": 0.8784096414570296,
+  "pertenencia_exactitud": 0.802443737921576,
+  "pertenencia_f1_sacro": 0.8068265411210829,
+  "pertenencia_f1_coxal_izquierdo": 0.9221071589374156,
+  "pertenencia_f1_coxal_derecho": 0.9062952243125905,
+  "pertenencia_auc_macro_ovr": 0.9998922211209303,
+  "pertenencia_gt_f1_macro": 0.9897548056730262,
+  "pertenencia_gt_exactitud": 0.9903372607692787,
+  "pertenencia_gt_auc_macro_ovr": 0.9996650853941341,
+  "regla_semantica_f1_macro": 0.8800259881013283,
+  "regla_caja_f1_macro": 0.8724832522909315,
+  "regla_semantica_gt_f1_macro": 0.9934862614379449,
+  "n_instancias_predichas": 31999,
+  "conflictos_cabeza_decoder": 1109,
+  "conflictos_frac": 0.03465733304165755,
+  "conflictos_emparejados": 31,
+  "conflictos_acierta_cabeza": 0.12903225806451613,
+  "conflictos_acierta_decoder": 0.8709677419354839,
+  "bbox_mean_iou": 0.8505863986247262,
+  "bbox_mean_iou_best_candidate": 0.8505863986247262,
+  "bbox_map50": 0.9253012241663621,
+  "bbox_map50_95": 0.6815162853946113,
+  "modelo_dice_macro": 0.9605039590207866,
+  "modelo_iou_macro": 0.9245605191929801,
+  "decoder_dice_macro": 0.966164518420869,
+  "decoder_iou_macro": 0.9349609789048235,
+  "targets": {
+    "pertenencia_f1_macro": {
+      "minimum": 0.85,
+      "met": true
+    },
+    "pertenencia_auc_macro_ovr": {
+      "minimum": 0.85,
+      "met": true
+    },
+    "bbox_mean_iou": {
+      "minimum": 0.65,
+      "met": true
+    },
+    "bbox_map50": {
+      "minimum": 0.65,
+      "met": true
+    },
+    "bbox_map50_95": {
+      "minimum": 0.4,
+      "met": true
+    },
+    "modelo_fragment_dice": {
+      "minimum": 0.85,
+      "met": false
+    },
+    "modelo_fragment_iou": {
+      "minimum": 0.7,
+      "met": false
+    }
+  }
+}

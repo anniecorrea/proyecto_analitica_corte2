@@ -371,9 +371,11 @@ def _load_model(checkpoint: Path, device: torch.device) -> tuple[nn.Module, dict
     if not isinstance(selected, dict):
         selected = {}
     stage = selected.get("stage", payload.get("stage"))
-    if stage != "C_conjunto":
+    # B_decoder: modelo completo al final de la etapa B (tronco y deteccion de A + decoder de B), exportado con
+    # src.exportar_etapa_b; se evalua para comparar con C y en la ablacion, que se detiene en B.
+    if stage not in ("C_conjunto", "B_decoder"):
         raise ValueError(
-            f"Se requiere el checkpoint completo de la etapa C_conjunto; el archivo indica {stage!r}."
+            f"Se requiere un modelo completo de la etapa C_conjunto o B_decoder; el archivo indica {stage!r}."
         )
     architecture = payload.get("architecture")
     if architecture is None:
@@ -1001,8 +1003,9 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
     """--plano todos: evalua los tres modelos por plano y escribe el resumen; --plano X: uno; --plano anterior: el
     modelo axial anterior (modelo_multitarea_final.pt) como antes."""
     planos_pedidos = list(PLANOS) if args.plano == "todos" else [args.plano]
-    if (args.checkpoint is not None or args.cabeza is not None) and len(planos_pedidos) > 1:
-        raise ValueError("--checkpoint y --cabeza solo se pueden usar con un plano (--plano axial|coronal|sagital|anterior).")
+    if (args.checkpoint is not None or args.cabeza is not None or getattr(args, "etiqueta", None)) and len(planos_pedidos) > 1:
+        raise ValueError("--checkpoint, --cabeza y --etiqueta solo se pueden usar con un plano "
+                         "(--plano axial|coronal|sagital|anterior).")
     resultados = {}
     for plano in planos_pedidos:
         sub = argparse.Namespace(**vars(args))
@@ -1058,8 +1061,10 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
     ))
     _COMPONENTS["DEVICE"] = DEVICE
     plane_mode = args.plano is not None
-    out_dir = OUT_DIR / args.plano if plane_mode else OUT_DIR
-    fig_dir = FIG_DIR / args.plano if plane_mode else FIG_DIR
+    # --etiqueta: carpeta propia (p. ej. axial_B o ablacion/axial_sin_cbam) para no pisar la evaluacion del modelo final
+    carpeta = getattr(args, "etiqueta", None) or args.plano
+    out_dir = OUT_DIR / carpeta if plane_mode else OUT_DIR
+    fig_dir = FIG_DIR / carpeta if plane_mode else FIG_DIR
     _load_project_components(plane_mode)
     _verify_class_convention()
     plane_info: dict[str, Any] = {}
@@ -1261,6 +1266,7 @@ def _evaluate_model(args: argparse.Namespace) -> dict[str, Any]:
                 "n_conflicto_semantica": sum(inst["conflicto_semantica"] for inst in salida["instancias"]),
                 "n_sin_caja": sum(inst["sin_caja"] for inst in salida["instancias"]),
                 "model_region_dice": score,
+                "n_gt_fragments": n_fragments,     # para rehacer las medias por fragmento (bootstrap por caso)
                 "model_fragment_dice": dice_sum / n_fragments if n_fragments else math.nan,
                 "model_fragment_iou": iou_sum / n_fragments if n_fragments else math.nan,
                 "sam_dice": _macro_dice(sam_semantic, gt_semantic) if sam_semantic is not None else math.nan,
@@ -1400,6 +1406,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cabeza", type=Path, default=None,
                         help="Pesos de la cabeza de pertenencia; por defecto cabeza_pertenencia_{plano}.pt "
                              "(o cabeza_pertenencia.pt con --plano anterior). Se verifica contra el tronco.")
+    parser.add_argument("--etiqueta", default=None,
+                        help="Subcarpeta de salida en metricas/evaluacion y figuras/evaluacion (por defecto el plano). "
+                             "Solo con un plano; sirve para evaluar otros checkpoints sin pisar los del modelo final.")
     parser.add_argument("--sam-checkpoint", type=Path)
     parser.add_argument("--sam-type", choices=("vit_b", "vit_l", "vit_h"), default="vit_b")
     parser.add_argument("--batch-size", type=int, default=8)
