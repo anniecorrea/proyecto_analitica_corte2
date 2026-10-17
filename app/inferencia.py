@@ -96,6 +96,16 @@ def cargar_pipeline():
     exec("from cbam_modulos import CBAM, CompuertaResidualCBAM", ns)
     cargar_definiciones(NOTEBOOKS_DIR / "salida_3d.ipynb", DEFINICIONES_SALIDA_3D, VALORES_SALIDA_3D, destino=ns)
     exec("from deteccion_grid import GridDetectionHead, postprocess, nms_por_clase", ns)
+    # PENGWIN_DEVICE: auto (GPU si hay, si no CPU; por defecto) | cpu | cuda. El servicio de AWS fija cpu; en local se
+    # puede forzar cpu para ver lo mismo que el servidor. AMP solo en GPU.
+    pedido = os.environ.get("PENGWIN_DEVICE", "auto").strip().lower()
+    if pedido not in ("auto", "cpu", "cuda"):
+        raise ValueError(f"PENGWIN_DEVICE={pedido!r}: usa auto, cpu o cuda.")
+    if pedido == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("PENGWIN_DEVICE=cuda, pero PyTorch no ve ninguna GPU.")
+    if pedido != "auto":
+        ns["DEVICE"] = torch.device(pedido)
+        ns["AMP"] = ns["DEVICE"].type == "cuda"
 
     modelos, info = {}, {}
     for plano, ruta in MODELOS.items():

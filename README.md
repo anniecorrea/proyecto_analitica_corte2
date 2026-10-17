@@ -1,27 +1,40 @@
-# Proyecto PENGWIN: fracturas pélvicas en tomografia
+# Proyecto PENGWIN: fracturas pélvicas en tomografía
 
 Este repositorio contiene un sistema académico que analiza tomografías computarizadas de pelvis con fractura, tomadas del dataset PENGWIN. Para cada estudio, el sistema:
 
-1. **Detección:** De tres regiones oseas de la pelvis (sacro, coxal izquierdo y coxal derecho) con una cabeza de detección propiaa basada en una grid y un NMS implementado por nosotros.
+1. **Detección:** localiza las tres regiones óseas de la pelvis (sacro, coxal izquierdo y coxal derecho) con una cabeza de detección propia, basada en una grilla, y un NMS implementado por nosotros.
 
-2. **Segmentación:** Cada fragmento oseo se clasifica según el hueso al que pertenece con un color caracteristico para cada una de las regiones.
+2. **Segmentación y clasificación:** separa cada fragmento óseo y lo clasifica según el hueso al que pertenece, con un color característico para cada región.
 
-3. **Muestras:** los resultados se presentan en un dashboard de Streamlit con 3 visualizadores: el volumen crudo, laa inferencia entre los cortes y la reconstrucción 3D.
+3. **Medición:** calcula en milímetros la distancia de cada fragmento suelto (conminuto) al fragmento principal de su hueso.
 
-**Aviso:** Proyecto con fines exclusivamente académicos. No es un dispositivo médico, no está validado clínicamente y no debe usarse para apoyar decisiones quirúrgicas reales.
+4. **Visualización:** muestra los resultados en una app de Streamlit con tres visualizadores: el volumen crudo, la inferencia corte por corte y la reconstrucción 3D.
+
+**Aviso:** proyecto con fines exclusivamente académicos. No es un dispositivo médico, no está validado clínicamente y no debe usarse para apoyar decisiones quirúrgicas reales.
 
 # Dataset
 
-Se usa la parte del CT del challenge de PENGWIN (MICCAI 2024). Son 100 tomografias de pelvis con fracturas y sus mascaras de fragmentos, anotada y validadas por ortopedistas. Los datos no se encuentran en el repositorio, ya que estos pesan varias GB, deberas de descargar el dataset en: [PENGWIN](https://zenodo.org/records/10927452) y crear la carpeta data_mha/ en la rama main del repositorio.
+Se usa la parte de CT del challenge PENGWIN (MICCAI 2024). Son 100 tomografías de pelvis con fractura y sus máscaras de fragmentos, anotadas y validadas por ortopedistas. Los datos no están en el repositorio porque pesan varios GB: descárgalos de [PENGWIN en Zenodo](https://zenodo.org/records/10927452) y déjalos en una carpeta `data_mha/` en la raíz del repositorio, así:
+
+```text
+data_mha/
+|-- PENGWIN_CT_train_images_part1/   # 001.mha ... 050.mha
+|-- PENGWIN_CT_train_images_part2/   # 051.mha ... 100.mha
+`-- PENGWIN_CT_train_labels/         # 001.mha ... 100.mha (máscaras)
+```
+
+En las máscaras, cada vóxel guarda el número de su fragmento: 1–10 sacro, 11–20 coxal izquierdo, 21–30 coxal derecho y 0 fondo.
+
+> Sin `data_mha/` igual puedes correr las pruebas, ver el dashboard de resultados y analizar en la app una tomografía propia. Los datos hacen falta para correr los notebooks y los scripts.
 
 # Instalación
 
 Requisitos:
 
-- Python
+- Python 3.12 o 3.13
 - Git y Git LFS
 
-**Recomendación:** Tener GPU disponible para entrenar el modelo.
+**Recomendación:** tener GPU disponible para entrenar el modelo. Para usar la app y revisar los resultados basta con la CPU.
 
 1. **Clonar y descargar los pesos**
 
@@ -31,15 +44,20 @@ cd proyecto_analitica_corte2
 git lfs install
 git lfs pull
 ```
+
+Sin `git lfs pull`, los modelos quedan como archivos de texto de unos pocos bytes y la app no los puede cargar.
+
 2. **Crear el ambiente virtual**
 
 **Windows**
 ```
-python -3.13 -m venv .venv
+py -3.13 -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-**MacOs / Linux**
+Si PowerShell no deja activar el ambiente, ejecuta una vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+**macOS / Linux**
 ```
 python3.13 -m venv .venv
 source .venv/bin/activate
@@ -52,253 +70,126 @@ python -m pip install --upgrade pip setuptools wheel
 python -m pip install --no-cache-dir -r requirements.txt
 ```
 
-# ------------------- En construcción -------------------------------------------------
+4. **Comprobar la instalación**
 
+```
+python -c "import torch, SimpleITK; print('torch', torch.__version__, '| GPU:', torch.cuda.is_available())"
+```
 
-## Regla de organizacion
+`GPU: False` es normal en un computador sin tarjeta NVIDIA: la app y las pruebas funcionan igual.
 
-El pipeline se divide en notebooks dentro de `notebooks/`, uno por etapa. Cada
-notebook se ejecuta por separado: lee los archivos que genera el anterior
-(`splits/dataset.csv`, el manifiesto de cortes positivos, etc.) en lugar de
-depender de lo que haya en memoria, y carga por nombre las clases y funciones
-compartidas desde el notebook donde viven
-(`src.definiciones_notebooks.cargar_definiciones`).
+# Paso a paso
 
-El codigo reutilizable y los scripts que se ejecutan fuera de los notebooks
-viven en `src/`. Todo lo que se genera va a `resultados/`, ordenado por tipo de
-archivo; `src/rutas.py` define esas carpetas en un solo lugar.
+Todos los comandos se ejecutan desde la raíz del repositorio, con el ambiente activo.
 
-Orden de ejecucion (la tabla va de arriba hacia abajo):
+## Paso 1 Ver los resultados
 
-| Notebook | Contenido | Genera en `resultados/` |
+En la misma app, abre **Dashboard de resultados**. Lee lo que ya está en `resultados/` y no calcula nada:
+
+| Pestaña | Qué muestra |
+|---|---|
+| Resumen | Métricas en test frente a los objetivos del proyecto y matriz de confusión |
+| Entrenamiento | Pérdida de entrenamiento de los tres modelos |
+| Modelo vs SAM | Nuestro modelo frente a SAM usando las mismas cajas |
+| Ablación | Efecto de quitar CBAM y de usar transfer learning, con intervalos de confianza |
+| Latencia | Tiempo por imagen y por tomografía en GPU y CPU |
+
+# Cómo se construyó el modelo (notebooks)
+
+Los notebooks de `notebooks/` cuentan, etapa por etapa, cómo se construyó el sistema. **Ya están ejecutados**: al abrirlos se ven el código, las salidas y las figuras, así que para entender el trabajo basta con leerlos en este orden. Volver a ejecutarlos es **opcional**.
+
+Si quieres ejecutar alguno: ábrelo en VS Code, elige el kernel del `.venv` y pulsa **Run All**. Necesitan `data_mha/`. Cada notebook lee los archivos que generó el anterior, y esos archivos ya vienen en el repositorio, así que cualquiera se puede ejecutar sin correr los anteriores.
+
+**CPU** = funciona en cualquier computador. **GPU** = entrena o procesa volúmenes completos con el modelo; hace falta una GPU NVIDIA.
+
+### 1. Datos y preprocesamiento
+
+| Notebook | Qué hace | Requiere |
 |---|---|---|
-| `Dataset_splits` | Verificacion CT-label, dataset curado, splits 75/5/20 | `splits/` (fuera de `resultados/`) |
-| `Ventaneo_hu` | Ventaneo HU y realce Otsu + CLAHE | — |
-| `EDA` | Fragmentos por region, volumenes, fragmento principal | `datos/fragmentos/` |
-| `Distancias_referencia` | Distancia 3D de cada fragmento al principal | `datos/distancias_referencia.csv` |
-| `Visualizacion_3d` | MIP en tres vistas y malla 3D interactiva | `html/` |
-| `Targets_deteccion` | Cajas por region, manifiesto, `PengwinDetectionDataset` | `datos/targets/`, `figuras/targets/`, `modelos/batch_fijo.pt` |
-| `Backbone` | Backbone FundidoraPC (`base` y `plus`) y sus pruebas | — |
-| `cbam` | CBAM y compuerta residual | — |
-| `Cabeza_grid` | Cabeza de deteccion grid y perdidas | — |
-| `Segmentacion_instancias` | Decoder con skips, centros/offsets, metricas, SAM | — |
-| `Entrenamiento_overfiting` | Prueba de memorizacion (semana 9) | `modelos/` y `metricas/entrenamiento_overfiting/` |
-| `Entrenamiento_multitarea` | Entrenamiento por etapas A/B/C | `modelos/`, `metricas/` y `figuras/entrenamiento_multitarea/` |
-| `nms_pertenencia_pipeline` | NMS por clase, cabeza de pertenencia, pipeline completo | `modelos/`, `metricas/` y `figuras/nms_pertenencia/` |
-| `Negativos_ajuste` | Ajuste fino con cortes sin pelvis (negativos), elegido con `val` | `datos/targets/manifest_cortes_negativos.csv`, `modelos/`, `metricas/` y `figuras/entrenamiento_negativos/` |
-| `Entrenamiento_negativos_completo` | Entrenamiento A, B y C desde cero con los negativos | `modelos/`, `metricas/` y `figuras/entrenamiento_negativos_completo/` |
-| `Comparacion_final_negativos` | Original vs. ajustado vs. desde cero en 3D y en estudios sin pelvis; aplica la regla | `metricas/comparacion_final_negativos/` |
+| `Dataset_splits` | Verifica los 100 pares imagen-máscara y crea la partición fija por paciente 75/5/20 (semilla 42) | CPU |
+| `Ventaneo_hu` | Ventana ósea en unidades Hounsfield y realce de contraste (Otsu + CLAHE) | CPU |
+| `EDA` | Análisis exploratorio: fragmentos por caso y por hueso, volúmenes y fragmento principal | CPU |
+| `Distancias_referencia` | Distancia real de cada fragmento a su principal, con la transformada de distancia y el espaciado físico | CPU |
+| `Visualizacion_3d` | Visualizador 1: proyecciones MIP y malla 3D del volumen crudo | CPU |
+| `Targets_deteccion` | Cajas de cada región y lista de cortes para entrenar | CPU |
 
-## Estructura
+### 2. Piezas del modelo
 
-```text
-.
-|-- notebooks/            # un notebook por etapa
-|-- src/                  # modulos del pipeline, evaluacion.py y rutas.py
-|-- tests/
-|-- resultados/           # todo lo generado, por tipo de archivo
-|   |-- datos/            # CSV que leen otros notebooks
-|   |-- metricas/         # historiales de entrenamiento y tablas de resultados
-|   |-- figuras/          # PNG, una subcarpeta por etapa
-|   |-- html/             # visualizadores interactivos
-|   |-- modelos/          # pesos .pth/.pt (se suben con Git LFS)
-|   `-- cache/            # cache del entrenamiento (no se sube a GitHub)
-|-- splits/
-|-- data_mha/
-|-- README.md
-|-- requirements.txt
-|-- IA_USAGE.md
-`-- Proyecto_Corte2_PENGWIN.docx
+| Notebook | Qué hace | Requiere |
+|---|---|---|
+| `Backbone` | Backbone FundidoraPC (versiones `base` y `plus`) | CPU |
+| `cbam` | Bloque de atención CBAM (canal y espacial) | CPU |
+| `Cabeza_grid` | Cabeza de detección por grilla, pérdidas y NMS | CPU |
+| `Segmentacion_instancias` | Decoder que separa los fragmentos con centros y desplazamientos | GPU |
+| `Entrenamiento_overfiting` | Prueba de memorización de un lote: comprueba que el modelo es capaz de aprender | GPU |
+
+### 3. Entrenamiento y sistema completo
+
+| Notebook | Qué hace | Requiere |
+|---|---|---|
+| `Entrenamiento_multitarea` | Primera versión del entrenamiento (solo axial), reemplazada por la siguiente | GPU |
+| `Entrenamiento_multitarea_planos` | **Entrenamiento de los tres modelos que usa la app** (axial, coronal y sagital), por etapas | GPU |
+| `prueba_ida_y_vuelta_planos` | Comprueba que pasar un volumen a cada plano y devolverlo no pierde información | CPU |
+| `Negativos_ajuste` | Ajuste con cortes sin pelvis, para no inventar fragmentos fuera de ella | GPU |
+| `nms_pertenencia_pipeline` | NMS por clase y cabeza de pertenencia (a qué hueso pertenece cada fragmento) | GPU |
+| `salida_3d` | Une los cortes en fragmentos 3D y ajusta esa etapa con validación | GPU |
+| `sam_baseline` | Comparación con SAM (modelo general, sin entrenar en este dataset) | GPU |
+
+# Scripts (`src/`)
+
+La evaluación final, la ablación y las mediciones se hicieron con scripts de Python, que se ejecutan uno por uno desde la raíz del repositorio. Sus resultados ya están en `resultados/` (es lo que muestra el dashboard), así que **ejecutarlos también es opcional**. Todos necesitan `data_mha/`, salvo los dos que solo leen resultados.
+
+Los que tienen opciones las muestran con `--help`; `analisis_pesos_cabezas` y `generar_evidencias_distancias` no tienen opciones y se ejecutan directamente.
+
+| Script | Qué hace | Requiere |
+|---|---|---|
+| `python -m src.evaluacion --plano todos --split test` | Métricas de la consigna en test para los tres modelos. Con `--sam-checkpoint resultados/modelos/modelos_sam/sam_vit_b_01ec64.pth` agrega la comparación con SAM | GPU (o `--device cpu`) |
+| `python -m src.medir_latencia --split test` | Latencia por imagen y por tomografía en GPU y CPU (con `--solo-cpu` si no hay GPU) | CPU y GPU |
+| `python -m src.distancias_pred_vs_gt --split test` | Distancia de cada fragmento en la predicción frente a la anotación real | GPU recomendada |
+| `python -m src.entrenar_pertenencia_planos --plano todos` | Entrena la cabeza de pertenencia de cada modelo | GPU recomendada |
+| `python -m src.verificar_planos_val` | Verifica en validación el control de "pelvis presente" y el armado 3D de los fragmentos | GPU recomendada |
+| `python -m src.preentrenar_backbone_pets --datos <carpeta oxford-iiit-pet>` | Preentrena el backbone en Oxford-IIIT Pet para el transfer learning (necesita ese dataset, no `data_mha/`) | GPU |
+| `python -m src.ablacion entrenar --variante sin_cbam` | Entrena una variante de la ablación (`sin_cbam`, `con_tl` o `sin_cbam_con_tl`) | GPU |
+| `python -m src.ablacion exportar-b --plano axial` | Exporta el modelo al final de la etapa B, usado como base de la ablación | CPU |
+| `python -m src.resumen_ablacion --split test` | Tablas con intervalos de confianza: ablación y etapa C frente a B. Solo lee resultados | CPU |
+| `python -m src.analisis_pesos_cabezas` | Análisis de los pesos entre la detección y la segmentación. Solo lee resultados | CPU |
+| `python -m src.generar_evidencias_distancias` | Figuras de revisión de las distancias de referencia | CPU |
+
+
+# Despliegue
+
+La app se puede publicar desde este computador de dos formas. Con el ambiente instalado y los pesos descargados, desde la raíz del repositorio en PowerShell:
+
+**Recomendado**
+**Con túnel de Cloudflare** (se puede abrir desde cualquier red, en computador o celular):
+
+```
+powershell -ExecutionPolicy Bypass -File deploy\local.ps1
 ```
 
-- `data_mha/`: datos pesados locales; no se suben a GitHub.
-- `splits/`: particion fija por paciente `75/5/20`, semilla 42.
-- Dentro de `metricas/`, `figuras/` y `modelos/` cada etapa usa el mismo nombre
-  de subcarpeta: lo de `nms_pertenencia` esta en las tres bajo ese nombre.
+**Solo en la red local** (este computador y celulares conectados a la misma Wi-Fi):
 
-## Datos locales
-
-La carpeta debe estar en la raiz del repositorio:
-
-```text
-data_mha/
-|-- PENGWIN_CT_train_images_part1/
-|-- PENGWIN_CT_train_images_part2/
-`-- PENGWIN_CT_train_labels/
+```
+powershell -ExecutionPolicy Bypass -File deploy\local.ps1 -SinTunel
 ```
 
-El flujo trabaja directamente con `.mha` mediante SimpleITK. No utiliza NIfTI
-ni requiere conversiones intermedias.
+- El script imprime las direcciones: `http://localhost:8501` para este computador, `http://<IP-local>:8501` para un celular en la misma Wi-Fi y `https://<algo>.trycloudflare.com` para el túnel.
+- La primera vez instala `cloudflared` con `winget`, si no está instalado.
+- El túnel gratuito de Cloudflare no deja subir archivos de más de 100 MB. Para tomografías más grandes, usa la red local (`-SinTunel`).
+- `Ctrl+C` detiene la app y el túnel.
 
-## Instalacion
+**Como usar el despliegue**
 
-macOS o Linux:
+1. En **Inicio**, sube una tomografía (`.mha`, `.nii` o `.nii.gz`). Puede ser del dataset PENGWIN o una que no pertenezca a él.
+2. Espera el análisis: corre los tres modelos (axial, coronal y sagital). Usa la GPU si la hay y, si no, la CPU.
+3. Revisa los tres visualizadores:
+   - **Volumen crudo:** proyección de máxima intensidad (MIP) con umbral de 300 HU.
+   - **Corte por corte:** mueve el slider para ver las cajas, las máscaras coloreadas por hueso y la distancia de cada fragmento.
+   - **Reconstrucción 3D:** malla interactiva con la distancia en la etiqueta de cada fragmento.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install --upgrade pip
-python3 -m pip install -r requirements.txt
-```
+**AWS:** el proyecto también está desplegado en un servidor de AWS EC2 (`deploy/instalar.sh`). Para acceder a esa versión, contacta al dueño de la máquina: [Juan Hoyos](https://github.com/JuanHoyos329).
 
-Windows:
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install --no-cache-dir -r requirements.txt
-```
+# Uso de IA
 
-## Ejecucion
-
-1. Abrir la carpeta del repositorio en Visual Studio Code.
-2. Abrir los notebooks de `notebooks/` en el orden de la tabla de arriba.
-3. Seleccionar el kernel del ambiente `.venv`.
-4. Pulsar **Run All** en cada uno.
-
-En un repositorio recien clonado, `splits/` y los CSV de `resultados/` ya
-vienen versionados, asi que cualquier notebook puede ejecutarse sin correr los
-anteriores. Los pesos de `resultados/modelos/` tambien vienen en el repositorio,
-pero por Git LFS (son archivos grandes): instalar Git LFS una vez y descargarlos.
-
-```bash
-git lfs install
-git lfs pull
-```
-
-Sin ese paso, los `.pth`/`.pt` quedan como punteros de texto de unos pocos bytes y
-`torch.load` falla. No se suben los `last_*.pth` (solo sirven para reanudar un
-entrenamiento) ni la cache de `resultados/cache/`.
-
-Para regenerar las capturas de revisión de distancia desde la raíz del
-repositorio, después de tener los datos locales instalados:
-
-```bash
-python -m src.generar_evidencias_distancias
-```
-
-Las capturas son proyecciones 2D para inspección; el valor de distancia se
-calcula en 3D con el espaciado físico del archivo MHA.
-
-## Frontend (Streamlit)
-
-Desde la raiz del repositorio, con el `.venv` activo:
-
-```bash
-streamlit run app/streamlit_app.py
-```
-
-- **Inicio**: titulo, introduccion del proyecto, la advertencia de uso academico y el boton para subir una tomografia
-  (`.mha`, `.nii` o `.nii.gz`). La prediccion arranca sola con los tres modelos por plano
-  (`modelo_multitarea_axial.pt`, `modelo_multitarea_coronal.pt` y `modelo_multitarea_sagital.pt`) y la configuracion
-  3D congelada en `resultados/metricas/salida_3d/config_3d.json`. La imagen y los resultados se conservan al ir al
-  dashboard y volver; se borran al quitar el archivo del cargador.
-  - **Fragmentos** (al inicio): cuantos fragmentos tiene la imagen (etiqueta de referencia) y cuantos predice el
-    modelo del plano elegido. La etiqueta se toma de `data_mha/PENGWIN_CT_train_labels/` si el archivo se llama como
-    un caso del dataset.
-  - Visualizadores de la consigna, en el plano elegido (axial, coronal o sagital; cada plano usa su modelo):
-    1. MIP coronal del volumen crudo con umbral de 300 HU (sin modelo).
-    2. Inferencia corte por corte con un slider: cajas del detector, mascaras coloreadas por hueso y la distancia de
-       separacion junto a la etiqueta de cada fragmento (o la referencia, si hay etiqueta).
-    3. Reconstruccion 3D: marching cubes (skimage) + Plotly Mesh3d, con la distancia en la etiqueta de cada fragmento.
-
-- **Dashboard de resultados**: metricas de val frente a los objetivos, entrenamiento de los tres modelos por plano,
-  modelo frente a SAM, fragmentos 3D por caso y latencia en CPU y GPU. Solo lee archivos de `resultados/`.
-
-Las funciones del pipeline no se copian: `app/inferencia.py` las carga por nombre desde los cuadernos, igual que
-`salida_3d.ipynb`. El limite de carga se sube a 1 GB en `.streamlit/config.toml`.
-
-Latencia por imagen y por tomografia en GPU y CPU (la lee el dashboard), con los datos en `data_mha/`:
-
-```bash
-python -m src.medir_latencia            # escribe resultados/metricas/latencia/latencia.json
-```
-
-Despliegue: `deploy/instalar.sh` deja el frontend como servicio en un servidor Ubuntu y lo publica con un tunel de
-Cloudflare (`deploy/pengwin-tunel.service`); la direccion `https://*.trycloudflare.com` sale en
-`sudo journalctl -u pengwin-tunel | grep trycloudflare`. El tunel de Cloudflare no deja subir archivos de mas de
-100 MB; las tomografias mas grandes se suben por la direccion directa del servidor (`http://<IP>:8501`).
-
-## Cortes sin pelvis (negativos)
-
-El entrenamiento original solo uso cortes con pelvis (`manifest_cortes_positivos.csv`). Al recorrer un volumen
-completo, los cortes de arriba y de abajo (femures, columna) reciben cajas: con el modelo 2.5D, en `val` 229 de 394
-cortes sin pelvis tienen alguna caja y 212 pasan `umbral_corte = 0.08` (el del modelo de 1 canal dejaba pasar 190 con 0.45). La mAP y el Dice no lo muestran porque se
-calculan solo sobre cortes positivos.
-
-`notebooks/Negativos_ajuste.ipynb` ajusta el modelo actual mezclando cortes sin un solo voxel de pelvis, compara dos
-proporciones y elige con `val` segun una regla escrita antes de entrenar (`src/cortes_vacios.CRITERIO`): menos
-cortes vacios que pasan, sin bajar la mAP@0.50 ni el Dice mas de 0.01 y conservando al menos el 99 % de los cortes
-con pelvis. Primero se corre con `SMOKE_TEST = True`; el modelo solo se adopta a mano (`ADOPTAR = True`) y despues
-hay que repetir `nms_pertenencia_pipeline` y `salida_3d`.
-
-Resultado del ajuste (val): los cortes vacios que pasan bajan de 212 a 172 sin cambio en mAP (0.864) ni Dice
-(0.944 -> 0.943); en 3D, con la configuracion congelada, el F1 por fragmento paso de 0.667 a 0.638 (20 fragmentos
-predichos frente a 18; reales 27).
-
-Como el sistema se va a probar con estudios que pueden no tener pelvis, el equipo decidio usar negativos y comparar
-dos candidatos con una regla fijada antes de entrenar (`src/cortes_vacios.regla_modelo_final`):
-
-1. `notebooks/Entrenamiento_negativos_completo.ipynb`: repite el entrenamiento original (etapas A, B y C, mismos
-   hiperparametros) con los 5.698 negativos de train desde la primera epoca. Revisa los topes en 2D.
-2. `notebooks/Comparacion_final_negativos.ipynb`: compara original, ajustado y desde cero en 3D, reajustando la
-   salida 3D para cada uno, y en los tramos sin pelvis de val tratados como estudios separados. Aplica la regla.
-
-Resultado del entrenamiento desde cero (val, volumenes completos): los cortes vacios que pasan bajan de 212 a 51 (13 %),
-con mAP@0.50 0.854 (original 0.864) y Dice 0.941. La tolerancia de mAP de la regla se amplio de 0.01 a 0.02 antes de
-la comparacion final (ver `IA_USAGE.md`).
-
-Control de "pelvis presente" (`src/control_pelvis.py`, usado por el frontend): si los cortes con una caja de score
->= 0.2 no forman un bloque continuo de al menos 80 mm, el estudio no tiene una pelvis completa y no se entregan
-fragmentos. En val, con pelvis el bloque mide 200 mm o mas; en los tramos sin pelvis, 32 mm como mucho.
-
-Pruebas sin GPU: `python -m unittest tests.test_cortes_vacios tests.test_control_pelvis -v`.
-
-## Evaluacion integrada
-
-Evalua los tres modelos por plano que exporta `notebooks/Entrenamiento_multitarea_planos.ipynb`
-(`modelo_multitarea_{axial,coronal,sagital}.pt`). Desde la raiz:
-
-```bash
-python -m src.evaluacion --plano todos --split val --device auto
-```
-
-La evaluacion corre el pipeline real del sistema (`src.pipeline_pengwin.inferir_cortes`): NMS por clase con
-`NMS_CONFIG`, decoder de instancias y cabeza de pertenencia. Cada modelo necesita su cabeza en
-`resultados/modelos/nms_pertenencia/cabeza_pertenencia_{plano}.pt` (`cabeza_pertenencia.pt` para `--plano anterior`),
-con su `_meta.json`, entrenada sobre ESE checkpoint: si el tronco no coincide, la evaluacion se detiene y pide
-reentrenar la etapa D. Las cabezas por plano se entrenan con `python -m src.entrenar_pertenencia_planos --plano todos
---device cuda` (tronco congelado, ~1 min por plano en GPU). La clasificacion por pertenencia se mide por fragmento real (los no emparejados con IoU >= 0.5
-cuentan como error) y se reporta junto con la cobertura, el modo con mascaras reales y las reglas base.
-
-Cada modelo se evalua con los mismos datos y el mismo codigo de su entrenamiento: las clases de dataset, la cache de
-cortes y `MultiTaskNet` se cargan del cuaderno de planos, y en `val` se reutiliza la cache que construyo el
-entrenamiento (orientacion canonica, pixeles cuadrados, entrada 2.5D y, en el sagital, el canal de posicion con la
-linea media del centro del campo de vision). El script comprueba que `dataset.csv`, `planos.py`, `orientacion.py` y
-los manifiestos sean los mismos que uso el entrenamiento (`datos_iguales_al_entrenamiento` en las metricas); si
-cambiaron, reconstruye la cache con la misma funcion. Las metricas de cada plano quedan en
-`resultados/metricas/evaluacion/{plano}/`, el resumen en `resumen_planos_{split}.csv` y los ejemplos de
-acierto/error en `resultados/figuras/evaluacion/{plano}/`. `--plano axial|coronal|sagital` evalua uno solo y
-`--plano anterior` el modelo axial anterior (`modelo_multitarea_final.pt`).
-
-La comparacion con SAM (`--sam-checkpoint ruta\sam_vit_b.pth`) corre solo sobre `test`, usando las cajas predichas
-como prompts. Usa `--device cpu` o `--device cuda` para medir cada escenario por separado.
-El manifiesto actual contiene cortes positivos, por lo que los resultados se
-interpretan sobre esos cortes y no sobre cortes vacios del volumen.
-La pertenencia (F1/AUC) se mide por fragmento real; la presencia de region por corte queda como diagnostico.
-Dice/IoU del modelo se calculan por fragmento con emparejamiento uno-a-uno dentro de su region (clase de la cabeza). La comparacion
-SAM se reporta por region, usando las mismas cajas predichas como prompts.
-
-## Resultados actuales
-
-- 100 imagenes y 100 labels `.mha` correctamente emparejados.
-- Splits por paciente: 75 entrenamiento, 5 validacion y 20 prueba.
-- Semilla fija: 42.
-- 575 fragmentos anotados.
-- Distancias de referencia para 275 fragmentos conminutos, comparados con el
-  fragmento principal de su región; los 300 principales se incluyen en la tabla
-  con distancia cero por definición.
-- Visualizador MIP y malla 3D interactiva.
-- 24.234 cortes positivos con targets de deteccion.
-- Cero pacientes compartidos entre splits.
+El registro del uso de herramientas de IA generativa (prompts, qué se tomó de ellas y qué se corrigió a mano) está en [IA_USAGE.md](IA_USAGE.md).

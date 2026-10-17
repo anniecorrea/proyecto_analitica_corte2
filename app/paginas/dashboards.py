@@ -154,12 +154,12 @@ with sam:
 
 # ---------------------------------------------------------------------------------------------------------------
 with ablacion:
-    # src/resumen_ablacion.py --split test (lo corre src/correr_pendientes.py)
+    # src/resumen_ablacion.py --split test
     tabla_abl = leer_csv(METRICAS_DIR / "comparaciones" / "ablacion_tabla_test.csv")
     difs_abl = leer_csv(METRICAS_DIR / "comparaciones" / "ablacion_test.csv")
     c_vs_b = leer_csv(METRICAS_DIR / "comparaciones" / "c_vs_b_test.csv")
     if tabla_abl is None and c_vs_b is None:
-        st.info("Aún no hay resultados de la ablación. Ejecuta `python -m src.correr_pendientes`.")
+        st.info("Aún no hay resultados de la ablación. Ejecuta `python -m src.resumen_ablacion --split test`.")
     if tabla_abl is not None:
         st.subheader("Ablación: CBAM y transfer learning")
         st.caption("Plano axial, al final de la etapa B (mismos datos, semilla y épocas). Base: con CBAM y sin transfer "

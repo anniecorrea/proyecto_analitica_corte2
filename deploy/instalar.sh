@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instala (o actualiza) el frontend en un servidor Ubuntu (24.04 o 26.04) de AWS EC2, sin GPU. Ver deploy/AWS.md.
+# Instala (o actualiza) el frontend en un servidor Ubuntu (24.04 o 26.04) de AWS EC2, sin GPU. Ver deploy/README.md.
 # Se puede correr las veces que haga falta: la primera vez instala todo y después solo trae los cambios.
 #
 #   curl -fsSL https://raw.githubusercontent.com/anniecorrea/proyecto_analitica_corte2/main/deploy/instalar.sh | bash
