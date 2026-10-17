@@ -3,7 +3,7 @@
   "batch_size": 1,
   "warmup_slices": 5,
   "n_measured": 50,
-  "pipeline_ms_mean": 16.187425999960396,
-  "pipeline_ms_p50": 16.129999999975553,
-  "pipeline_ms_p95": 17.79450499916493
+  "pipeline_ms_mean": 23.518973999889567,
+  "pipeline_ms_p50": 23.20510000026843,
+  "pipeline_ms_p95": 26.238099999500264
 }

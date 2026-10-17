@@ -29,7 +29,8 @@ CONTRATO
   masks, batch_idx, labels = targets_pertenencia(instance_masks)   # instance_masks: lista de [H,W] con IDs 1..30
   logits = head(f4, masks, batch_idx)                              # [K, 3]
   loss = perdida_pertenencia(logits, labels)                       # escalar; 0 conectado al grafo si K = 0
-  En la pérdida conjunta: L = L_det + λ_seg·L_seg + λ_cls·L_cls (λ_cls se justifica con val).
+  La cabeza NO entra en la pérdida conjunta: se entrena aparte, con el tronco congelado (etapa D;
+  src/entrenar_pertenencia_planos.py), así que no hay un peso λ_cls que calibrar.
   En entrenamiento las máscaras son las REALES (teacher forcing); en inferencia, las que predice el decoder.
 """
 import numpy as np
