@@ -25,32 +25,34 @@ Requisitos:
 
 1. **Clonar y descargar los pesos**
 
-´´
+```bash
 git clone https://github.com/anniecorrea/proyecto_analitica_corte2.git
 cd proyecto_analitica_corte2
 git lfs install
 git lfs pull
-
+```
 2. **Crear el ambiente virtual**
 
 **Windows**
-´´
+```
 python -3.13 -m venv .venv
 .venv\Scripts\Activate.ps1
-´´
+```
 
 **MacOs / Linux**
-´´
+```
 python3.13 -m venv .venv
 source .venv/bin/activate
-´´
+```
 
 3. **Instalar dependencias**
 
-´´
+```
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install --no-cache-dir -r requirements.txt
-´´
+```
+
+# ------------------- En construcción -------------------------------------------------
 
 
 ## Regla de organizacion

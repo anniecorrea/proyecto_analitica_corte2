@@ -19,7 +19,7 @@ st.markdown(
     "dos huesos coxales, separa los fragmentos óseos de cada hueso y los une en 3D. Para cada fragmento se informa su "
     "volumen y la distancia de separación al fragmento principal de su hueso.\n\n"
     "**Cómo usar la página:** sube una tomografía." \
-    "Las métricas de entrenamiento y validación están en **Dashboard de resultados**.")
+    "Las métricas en test están en **Dashboard de resultados**.")
 
 
 @st.cache_resource(show_spinner=False)

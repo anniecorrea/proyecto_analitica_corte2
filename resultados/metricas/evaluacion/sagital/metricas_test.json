@@ -1,0 +1,78 @@
+{
+  "split": "test",
+  "plano": "sagital",
+  "checkpoint": "resultados/modelos/entrenamiento_multitarea_sagital/modelo_multitarea_sagital.pt",
+  "checkpoint_stage": "C_conjunto",
+  "device": "cuda",
+  "n_slices": 6658,
+  "n_cases": 20,
+  "mean_inference_ms_per_slice_batched": 12.328703469511646,
+  "cls_threshold": 0.5,
+  "score_threshold": 0.01,
+  "nms_iou": 0.5,
+  "evaluated_slices_note": "solo cortes positivos del manifiesto (con al menos una region GT)",
+  "n_ground_truth_fragments": 11721,
+  "modelo_fragment_dice": 0.795976965863663,
+  "modelo_fragment_iou": 0.7203276202068456,
+  "nms_function": "src.deteccion_grid:nms_por_clase",
+  "sam": "evaluated",
+  "datos": "cache de cortes de Entrenamiento_multitarea_planos.ipynb (mismo preprocesamiento del entrenamiento)",
+  "datos_iguales_al_entrenamiento": true,
+  "diferencias_datos": [],
+  "linea_media_sagital": "fov",
+  "classification_f1_macro": 0.9806025889110176,
+  "classification_f1_micro": 0.9815648894940819,
+  "classification_auc_macro": 0.996708413352216,
+  "bbox_mean_iou": 0.8527380809249402,
+  "bbox_mean_iou_best_candidate": 0.8704249179142395,
+  "bbox_map50": 0.9429691278435883,
+  "bbox_map50_95": 0.7270306095726272,
+  "modelo_dice_macro": 0.9610782678747727,
+  "modelo_iou_macro": 0.925297537701573,
+  "sam_dice_macro": 0.7981185362927125,
+  "sam_iou_macro": 0.6641927647709521,
+  "sam_checkpoint": "resultados/modelos/modelos_sam/sam_vit_b_01ec64.pth",
+  "sam_model_type": "vit_b",
+  "targets": {
+    "classification_f1_macro": {
+      "minimum": 0.85,
+      "met": true
+    },
+    "classification_auc_macro": {
+      "minimum": 0.85,
+      "met": true
+    },
+    "bbox_mean_iou": {
+      "minimum": 0.65,
+      "met": true
+    },
+    "bbox_map50": {
+      "minimum": 0.65,
+      "met": true
+    },
+    "bbox_map50_95": {
+      "minimum": 0.4,
+      "met": true
+    },
+    "modelo_fragment_dice": {
+      "minimum": 0.85,
+      "met": false
+    },
+    "modelo_fragment_iou": {
+      "minimum": 0.7,
+      "met": true
+    }
+  },
+  "latency": {
+    "device": "cuda",
+    "batch_size": 1,
+    "warmup_slices": 5,
+    "n_measured": 50,
+    "pipeline_ms_mean": 17.140084000202478,
+    "pipeline_ms_p50": 15.970399999787332,
+    "pipeline_ms_p95": 25.51588499918579,
+    "sam_ms_mean": 216.25291400021524,
+    "sam_ms_p50": 215.86854999986826,
+    "sam_ms_p95": 221.45897500067804
+  }
+}

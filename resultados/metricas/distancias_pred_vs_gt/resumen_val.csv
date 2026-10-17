@@ -1,0 +1,4 @@
+plano,casos,conminutos,n_separado,n_fusionado,n_omitido,principales_ok,principales,mae_mm,mediana_error_mm,max_error_mm,mae_separados_mm,conminutos_separados_en_gt,mae_separados_en_gt_mm
+axial,5,12,0,10,2,15,15,0.0,0.0,0.0,,1,
+coronal,5,12,0,10,2,14,15,1.0056456078952571,0.0,10.056456078952571,,1,10.056456078952571
+sagital,5,12,0,8,4,15,15,0.0,0.0,0.0,,1,

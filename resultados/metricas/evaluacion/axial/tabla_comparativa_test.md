@@ -1,0 +1,11 @@
+| Metrica | Objetivo | Modelo | SAM | Cumple |
+|---|---|---|---|---|
+| Clasificacion F1 macro | >= 0.85 | 0.973 | - | si |
+| Clasificacion AUC macro | >= 0.85 | 0.986 | - | si |
+| Deteccion IoU promedio | >= 0.65 | 0.858 | - | si |
+| Deteccion mAP@0.50 | >= 0.65 | 0.938 | - | si |
+| Deteccion mAP@[0.50:0.95] | >= 0.40 | 0.694 | - | si |
+| Segmentacion Dice por fragmento | >= 0.85 | 0.796 | - | no |
+| Segmentacion IoU por fragmento | >= 0.70 | 0.707 | - | si |
+| Dice semantico macro (modelo vs SAM) |  | 0.966 | 0.799 |  |
+| IoU semantico macro (modelo vs SAM) |  | 0.935 | 0.667 |  |

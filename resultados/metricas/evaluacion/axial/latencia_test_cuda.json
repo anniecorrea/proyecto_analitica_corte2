@@ -1,0 +1,12 @@
+{
+  "device": "cuda",
+  "batch_size": 1,
+  "warmup_slices": 5,
+  "n_measured": 50,
+  "pipeline_ms_mean": 19.244092000008095,
+  "pipeline_ms_p50": 18.725900001300033,
+  "pipeline_ms_p95": 25.298479999219122,
+  "sam_ms_mean": 229.0757679995295,
+  "sam_ms_p50": 228.09889999916777,
+  "sam_ms_p95": 240.40136000076018
+}
