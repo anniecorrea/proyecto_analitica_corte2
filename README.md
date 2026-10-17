@@ -216,7 +216,8 @@ La evaluacion corre el pipeline real del sistema (`src.pipeline_pengwin.inferir_
 `NMS_CONFIG`, decoder de instancias y cabeza de pertenencia. Cada modelo necesita su cabeza en
 `resultados/modelos/nms_pertenencia/cabeza_pertenencia_{plano}.pt` (`cabeza_pertenencia.pt` para `--plano anterior`),
 con su `_meta.json`, entrenada sobre ESE checkpoint: si el tronco no coincide, la evaluacion se detiene y pide
-reentrenar la etapa D. La clasificacion por pertenencia se mide por fragmento real (los no emparejados con IoU >= 0.5
+reentrenar la etapa D. Las cabezas por plano se entrenan con `python -m src.entrenar_pertenencia_planos --plano todos
+--device cuda` (tronco congelado, ~1 min por plano en GPU). La clasificacion por pertenencia se mide por fragmento real (los no emparejados con IoU >= 0.5
 cuentan como error) y se reporta junto con la cobertura, el modo con mascaras reales y las reglas base.
 
 Cada modelo se evalua con los mismos datos y el mismo codigo de su entrenamiento: las clases de dataset, la cache de
