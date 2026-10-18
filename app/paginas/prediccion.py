@@ -6,6 +6,7 @@ import streamlit as st
 
 import inferencia
 import visualizacion as vis
+from src import plausibilidad_pelvis as plausibilidad
 
 # El cargador no muestra el límite de tamaño ni los formatos aceptados (solo "Subir imagen").
 st.markdown("<style>[data-testid='stFileUploaderDropzoneInstructions'] {display: none;}</style>",
@@ -25,6 +26,23 @@ st.markdown(
 @st.cache_resource(show_spinner=False)
 def obtener_pipeline():
     return inferencia.cargar_pipeline()
+
+
+@st.cache_resource(show_spinner=False)
+def obtener_referencia_pelvis():
+    """Rangos de la pelvis en los pacientes de entrenamiento (src/plausibilidad_pelvis.py); None si no están."""
+    return plausibilidad.cargar_referencia()
+
+
+def revisar_plausibilidad(res, spacing):
+    """{"avisos": [...], "notas": [...]} sobre la pelvis predicha: avisos si se sale de lo esperable para una pelvis
+    humana adulta; notas si solo se sale del rango de los pacientes de entrenamiento. Solo se revisa cuando el control
+    de pelvis la dio por presente; sin la referencia no se revisa."""
+    referencia = obtener_referencia_pelvis()
+    if referencia is None or not res["pelvis"]["presente"]:
+        return {"avisos": [], "notas": []}
+    regiones_pred = plausibilidad.regiones_desde_instancias(res["instance_volume"], res["region_by_id"])
+    return plausibilidad.evaluar_niveles(plausibilidad.medidas_pelvis(regiones_pred, spacing), referencia)
 
 
 try:
@@ -76,6 +94,7 @@ if archivo is not None:
                 tabla, inst = res["fragmentos"], res["instance_volume"]
                 por_plano[plano] = {
                     "res": res,
+                    "plausibilidad": revisar_plausibilidad(res, spacing),
                     "lut": vis.tabla_de_colores(dict(zip(tabla["fragment_id"], tabla["class"])), colores, int(inst.max())),
                     "etiquetas": {int(f["fragment_id"]): vis.etiqueta_fragmento(f) for _, f in tabla.iterrows()},
                 }
@@ -149,6 +168,11 @@ res, lut = dp["res"], dp["lut"]
 nombre_modelo = f"modelo {inferencia.NOMBRE_PLANO[plano].lower()}"
 if not res["pelvis"]["presente"]:
     st.warning(inferencia.control_pelvis.MENSAJE_SIN_PELVIS)
+elif isinstance(dp.get("plausibilidad"), dict):
+    if dp["plausibilidad"]["avisos"]:
+        st.warning(plausibilidad.mensaje(dp["plausibilidad"]["avisos"]), icon="⚠️")
+    if dp["plausibilidad"]["notas"]:
+        st.info(plausibilidad.mensaje_nota(dp["plausibilidad"]["notas"]), icon="ℹ️")
 c = st.columns(2)
 c[0].metric("Fragmentos en la imagen", len(ref["fragmentos"]) if ref is not None else "sin etiqueta", border=True)
 c[1].metric(f"Fragmentos predichos ({nombre_modelo})", len(res["fragmentos"]), border=True)

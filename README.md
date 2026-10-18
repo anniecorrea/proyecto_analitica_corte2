@@ -154,7 +154,16 @@ Los que tienen opciones las muestran con `--help`; `analisis_pesos_cabezas` y `g
 | `python -m src.resumen_ablacion --split test` | Tablas con intervalos de confianza: ablación y etapa C frente a B. Solo lee resultados | CPU |
 | `python -m src.analisis_pesos_cabezas` | Análisis de los pesos entre la detección y la segmentación. Solo lee resultados | CPU |
 | `python -m src.generar_evidencias_distancias` | Figuras de revisión de las distancias de referencia | CPU |
+| `python -m src.plausibilidad_pelvis referencia` | Rangos de tamaño y proporciones de la pelvis en los pacientes de entrenamiento. La app los usa para advertir cuando una tomografía se sale de lo esperado para una pelvis humana adulta | CPU |
+| `python -m src.plausibilidad_pelvis verificar --predicciones` | Comprueba que la advertencia no salte en los pacientes de validación y prueba, y que sí detecte casos simulados (otro tamaño, lados invertidos, hueso faltante). Sin `--predicciones` usa solo las anotaciones | CPU (con `--predicciones`, GPU recomendada) |
 
+# Model cards
+
+Cada modelo tiene su ficha técnica, con arquitectura, datos de entrenamiento, métricas en test, alcances, limitaciones conocidas:
+
+- [Modelo axial](model_cards/axial.md)
+- [Modelo coronal](model_cards/coronal.md)
+- [Modelo sagital](model_cards/sagital.md)
 
 # Despliegue
 

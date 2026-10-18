@@ -1,0 +1,68 @@
+{
+  "fuente": "anotaciones de los pacientes de entrenamiento (splits/dataset.csv, split train)",
+  "n_casos": 75,
+  "percentil_tamano": 0.5,
+  "intervalo_tolerancia": {
+    "cobertura": 0.999,
+    "confianza": 0.99,
+    "escala": "logaritmica",
+    "factor_k": 4.084565341120265
+  },
+  "orden_lateral_ok": 75,
+  "rangos": {
+    "ancho_mm": {
+      "min": 220.0959930419922,
+      "max": 299.18359375,
+      "p5": 238.2806538939476,
+      "mediana": 262.75200176239014,
+      "p95": 286.6275489091873,
+      "tolerancia_min": 203.24912978897572,
+      "tolerancia_max": 336.66267564990164
+    },
+    "profundidad_mm": {
+      "min": 117.4140625,
+      "max": 162.65600109100342,
+      "p5": 126.055078125,
+      "mediana": 139.638671875,
+      "p95": 150.41201993227006,
+      "tolerancia_min": 108.64736604503577,
+      "tolerancia_max": 176.0905623555328
+    },
+    "alto_mm": {
+      "min": 170.0,
+      "max": 222.0,
+      "p5": 179.7,
+      "mediana": 195.2119140625,
+      "p95": 211.24599609375,
+      "tolerancia_min": 157.19343369722097,
+      "tolerancia_max": 241.1149597249341
+    },
+    "volumen_cm3": {
+      "min": 555.6561562500001,
+      "max": 1095.2255580101014,
+      "p5": 596.5352739933014,
+      "mediana": 767.4726703754559,
+      "p95": 966.4902263341431,
+      "tolerancia_min": 419.7925308748161,
+      "tolerancia_max": 1423.6931860794855
+    },
+    "fraccion_sacro": {
+      "min": 0.20673628241575495,
+      "max": 0.300772593658063,
+      "p5": 0.21642617833604888,
+      "mediana": 0.2436116808416649,
+      "p95": 0.2854686393765279,
+      "tolerancia_min": 0.17118532237552128,
+      "tolerancia_max": 0.3494774370968544
+    },
+    "simetria_coxales": {
+      "min": 0.930611643127164,
+      "max": 0.9980779624948193,
+      "p5": 0.9453768432841995,
+      "mediana": 0.9836709598233304,
+      "p95": 0.9954690556845617,
+      "tolerancia_min": 0.912374239552437,
+      "tolerancia_max": 1.0474646378294126
+    }
+  }
+}
