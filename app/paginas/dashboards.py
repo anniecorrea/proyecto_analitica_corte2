@@ -30,8 +30,7 @@ def layout(fig, alto=340, **kw):
 
 
 st.title("Dashboard de resultados")
-st.caption("Resultados sobre el conjunto de **test** (20 casos que no se usaron para entrenar ni para elegir modelos o "
-           "umbrales), evaluado una sola vez con todo congelado.")
+st.caption("Resultados sobre el conjunto de **test**")
 # src/evaluacion.py --plano todos --split test: una carpeta por modelo
 evaluaciones = {p: leer_json(METRICAS_DIR / "evaluacion" / p / "metricas_test.json") for p in PLANOS}
 evaluaciones = {p: e for p, e in evaluaciones.items() if e is not None}
@@ -70,15 +69,19 @@ with resumen:
                 valor, objetivo = valor_y_objetivo(evaluacion, claves)
                 col.metric(nombre, f"{valor:.3f}", f"{valor - objetivo:+.3f} vs objetivo {objetivo:.2f}",
                            border=True)
-        if "pertenencia_f1_macro" in evaluacion:
-            st.caption("Clasificación: hueso asignado a cada fragmento real por el sistema completo (detección → "
-                       "decoder → cabeza de pertenencia); un fragmento que el sistema no encuentra cuenta como error. "
-                       f"Con la regla semántica del decoder, que es la que usa el frontend, el F1 es "
-                       f"{evaluacion['regla_semantica_f1_macro']:.3f}. Fragmentos encontrados (IoU ≥ 0.5): "
-                       f"{evaluacion['pertenencia_cobertura']:.1%}.")
-        st.caption("Dice e IoU de segmentación son por fragmento 2D (cada fragmento real contra su mejor "
-                   f"predicción en el corte). Por región anatómica, el Dice es {evaluacion['modelo_dice_macro']:.3f} "
-                   f"y el IoU {evaluacion['modelo_iou_macro']:.3f}.")
+        # Reconstrucción 3D que usa la app (fusión de los tres planos): src/evaluar_fusion_3d.py
+        fusion = leer_json(METRICAS_DIR / "fusion_3d" / "metricas_test.json")
+        if fusion is not None:
+            st.markdown("**Segmentación por fragmento en 3D: reconstrucción de la app**")
+            cols = st.columns(4)
+            for col, (nombre, clave) in zip(cols, (("Dice por fragmento 3D", "dice_por_fragmento_3d"),
+                                                   ("IoU por fragmento 3D", "iou_por_fragmento_3d"))):
+                valor, objetivo = fusion[clave], fusion["objetivos"][clave]
+                col.metric(nombre, f"{valor:.3f}", f"{valor - objetivo:+.3f} vs objetivo {objetivo:.2f}", border=True)
+            cols[2].metric("IoU de los fragmentos encontrados", f"{fusion['sq_iou_medio_aciertos']:.3f}", border=True,
+                           help="IoU medio de los fragmentos reales emparejados con IoU ≥ 0.5 (SQ del challenge)")
+            cols[3].metric("Fragmentos reales encontrados", f"{fusion['recall_iou50']:.0%}", border=True,
+                           help=f"Con IoU ≥ 0.5. Precisión: {fusion['precision_iou50']:.0%} de los predichos son reales.")
         confusion = FIGURAS_DIR / "evaluacion" / plano_eval / "pertenencia_confusion_test.png"
         if confusion.is_file():
             with st.expander("Matriz de confusión de la clasificación (pertenencia por fragmento)"):
@@ -156,11 +159,9 @@ with sam:
 with ablacion:
     # src/resumen_ablacion.py --split test
     tabla_abl = leer_csv(METRICAS_DIR / "comparaciones" / "ablacion_tabla_test.csv")
-    difs_abl = leer_csv(METRICAS_DIR / "comparaciones" / "ablacion_test.csv")
-    c_vs_b = leer_csv(METRICAS_DIR / "comparaciones" / "c_vs_b_test.csv")
-    if tabla_abl is None and c_vs_b is None:
+    if tabla_abl is None:
         st.info("Aún no hay resultados de la ablación. Ejecuta `python -m src.resumen_ablacion --split test`.")
-    if tabla_abl is not None:
+    else:
         st.subheader("Ablación: CBAM y transfer learning")
         st.caption("Plano axial, al final de la etapa B (mismos datos, semilla y épocas). Base: con CBAM y sin transfer "
                    "learning. Transfer learning: backbone preentrenado como clasificador en Oxford-IIIT Pet (fotos en "
@@ -169,28 +170,6 @@ with ablacion:
                      hide_index=True, width="stretch",
                      column_config={c: st.column_config.NumberColumn(format="%.3f")
                                     for c in tabla_abl.columns if tabla_abl[c].dtype.kind == "f"})
-
-    def tabla_diferencias(t, grupo):
-        t = t[t["ic95_inf"].notna()].copy()
-        t["IC 95 %"] = [f"[{a:+.3f}, {b:+.3f}]" for a, b in zip(t["ic95_inf"], t["ic95_sup"])]
-        t["Lectura"] = ["mejora relevante" if r and d > 0 else "empeora" if s and d < 0 else
-                        "mejora pequeña" if s else "sin diferencia" for d, s, r in
-                        zip(t["diferencia"], t["significativa"], t["relevante"])]
-        return t[[grupo, "metrica", "referencia", "nuevo", "diferencia", "IC 95 %", "Lectura"]]
-
-    if difs_abl is not None:
-        st.markdown("**Diferencia de cada variante frente a la base**, con intervalo de confianza del 95 % (bootstrap "
-                    "pareado por paciente). Es relevante si el intervalo no incluye 0 y la diferencia supera 0.01.")
-        st.dataframe(tabla_diferencias(difs_abl, "variante"), hide_index=True, width="stretch",
-                     column_config={c: st.column_config.NumberColumn(format="%.3f")
-                                    for c in ("referencia", "nuevo", "diferencia")})
-    if c_vs_b is not None:
-        st.subheader("¿La etapa C mejora a la B?")
-        st.caption("Se decidió con validación que C no aporta lo suficiente para entrenarla en la ablación; aquí se "
-                   "muestra test solo como evidencia (diferencia = C − B).")
-        st.dataframe(tabla_diferencias(c_vs_b, "plano"), hide_index=True, width="stretch",
-                     column_config={c: st.column_config.NumberColumn(format="%.3f")
-                                    for c in ("referencia", "nuevo", "diferencia")})
 
 # ---------------------------------------------------------------------------------------------------------------
 with latencia:

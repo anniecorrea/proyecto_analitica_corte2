@@ -1,4 +1,4 @@
-"""figuras_pertenencia.py -- Matriz de confusion de la pertenencia anatomica (seccion 7). Autor: Fabian.
+"""figuras_pertenencia.py -- Matriz de confusion de la pertenencia anatomica (seccion 7).
 
 Una figura con dos paneles, en la misma escala de color, para separar las dos fuentes de error:
 

@@ -1,0 +1,18 @@
+{
+  "split": "test",
+  "n_casos": 20,
+  "n_fragmentos_reales": 114,
+  "n_fragmentos_predichos": 65,
+  "dice_por_fragmento_3d": 0.5110270975951718,
+  "iou_por_fragmento_3d": 0.4786219981777018,
+  "sq_iou_medio_aciertos": 0.8660779014644127,
+  "recall_iou50": 0.5526315789473685,
+  "precision_iou50": 0.9692307692307692,
+  "objetivos": {
+    "dice_por_fragmento_3d": 0.85,
+    "iou_por_fragmento_3d": 0.7
+  },
+  "definicion": "misma que la métrica 2D de src/evaluacion.py: pareja uno a uno por IoU dentro del hueso, sin umbral; fragmento real sin pareja = 0; promedio sobre todos los fragmentos reales",
+  "reconstruccion": "fusión de los 3 planos (modelos B, pesos iguales), componentes conexos 3D >= 500 mm³",
+  "fuente_probabilidades": "resultados/resultados_test_fusion.zip"
+}

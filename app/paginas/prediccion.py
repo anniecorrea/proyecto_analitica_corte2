@@ -17,15 +17,16 @@ st.markdown(
     "**Detección, segmentación y medición de fracturas pélvicas en tomografía computarizada.**\n\n"
     "Este proyecto académico, basado en el reto PENGWIN, analiza una tomografía de pelvis con tres modelos de "
     "aprendizaje profundo, uno por plano anatómico (**axial, coronal y sagital**). Cada modelo localiza el sacro y los "
-    "dos huesos coxales, separa los fragmentos óseos de cada hueso y los une en 3D. Para cada fragmento se informa su "
-    "volumen y la distancia de separación al fragmento principal de su hueso.\n\n"
+    "dos huesos coxales en su plano; sus resultados se **fusionan en 3D** para separar los fragmentos óseos de cada "
+    "hueso. Para cada fragmento se informa su volumen y la distancia de separación al fragmento principal de su hueso.\n\n"
     "**Cómo usar la página:** sube una tomografía." \
     "Las métricas en test están en **Dashboard de resultados**.")
 
 
 @st.cache_resource(show_spinner=False)
 def obtener_pipeline():
-    return inferencia.cargar_pipeline()
+    # modelos de la etapa B: la fusión 3D de los tres planos se validó en test con ellos (Test_final_fusion_B.ipynb)
+    return inferencia.cargar_pipeline(fusion=True)
 
 
 @st.cache_resource(show_spinner=False)
@@ -81,27 +82,20 @@ if archivo is not None:
             with st.spinner("Leyendo imagen"):
                 volume, spacing = inferencia.leer_canonico(origen, nombre)
             del origen
-            total = sum(volume.shape)                  # cortes de los tres planos
             barra = st.progress(0.0, text="Analizando la tomografía")
-            hechos, por_plano = 0, {}
-            for plano in inferencia.PLANOS:
-                texto = f"Modelo {inferencia.NOMBRE_PLANO[plano].lower()}"
-                res = inferencia.predecir_plano(
-                    pipeline, plano, volume, spacing, case_id=nombre,
-                    progreso=lambda k, n, base=hechos, t=texto: barra.progress(min((base + k) / total, 1.0),
-                                                                               text=f"{t}: corte {k} de {n}"))
-                hechos += inferencia.planos.n_slices(volume.shape, plano)
-                tabla, inst = res["fragmentos"], res["instance_volume"]
-                por_plano[plano] = {
-                    "res": res,
-                    "plausibilidad": revisar_plausibilidad(res, spacing),
-                    "lut": vis.tabla_de_colores(dict(zip(tabla["fragment_id"], tabla["class"])), colores, int(inst.max())),
-                    "etiquetas": {int(f["fragment_id"]): vis.etiqueta_fragmento(f) for _, f in tabla.iterrows()},
-                }
-                gc.collect()
+            res = inferencia.predecir_fusion(
+                pipeline, volume, spacing, case_id=nombre,
+                progreso=lambda k, n, pl: barra.progress(min(k / n, 1.0), text=f"Modelo {pl}: corte {k} de {n} (3 planos)"))
             barra.empty()
+            tabla, inst = res["fragmentos"], res["instance_volume"]
+            fusion = {
+                "res": res,
+                "plausibilidad": revisar_plausibilidad(res, spacing),
+                "lut": vis.tabla_de_colores(dict(zip(tabla["fragment_id"], tabla["class"])), colores, max(int(inst.max()), 1)),
+                "etiquetas": {int(f["fragment_id"]): vis.etiqueta_fragmento(f) for _, f in tabla.iterrows()},
+            }
             st.session_state["prediccion"] = {
-                "clave": clave, "nombre": nombre, "spacing": spacing, "forma": volume.shape, "planos": por_plano,
+                "clave": clave, "nombre": nombre, "spacing": spacing, "forma": volume.shape, "fusion": fusion,
                 "gris": vis.ventanear(volume), "mip": inferencia.mip_hueso(volume), "figuras": {},
             }
         except Exception as e:
@@ -112,6 +106,9 @@ if archivo is not None:
             gc.collect()
 
 pred = st.session_state.get("prediccion")
+if pred is not None and "fusion" not in pred:          # resultado de una versión anterior de la app (por plano)
+    st.session_state.pop("prediccion", None)
+    pred = None
 if pred is None:
     st.stop()
 if archivo is None:
@@ -158,14 +155,11 @@ if fuente_ref is not None and (ref is None or ref["clave"] != fuente_ref[0]) and
     gc.collect()
 
 # ---------------------------------------------------------------------------------------------------------------
-# Plano (cada uno con su modelo) y fragmentos: los de la imagen (si hay etiqueta) y los que predice el modelo
+# Fragmentos: los de la imagen (si hay etiqueta) y los que predice la fusión de los tres planos
 # ---------------------------------------------------------------------------------------------------------------
-plano = st.radio("Plano", inferencia.PLANOS, format_func=inferencia.NOMBRE_PLANO.get, horizontal=True,
-                 key="plano_detalle", help="Cada plano tiene su propio modelo: cambia los fragmentos predichos, el "
-                                          "corte que se ve y la reconstrucción 3D.")
-dp = pred["planos"][plano]
+dp = pred["fusion"]
 res, lut = dp["res"], dp["lut"]
-nombre_modelo = f"modelo {inferencia.NOMBRE_PLANO[plano].lower()}"
+nombre_modelo = "fusión de los 3 planos"
 if not res["pelvis"]["presente"]:
     st.warning(inferencia.control_pelvis.MENSAJE_SIN_PELVIS)
 elif isinstance(dp.get("plausibilidad"), dict):
@@ -206,6 +200,9 @@ izq.image(vis.imagen_mip_hueso(pred["mip"], spacing, inferencia.UMBRAL_HUESO_HU)
 # Visualizador 2: corte por corte en el plano elegido
 # ---------------------------------------------------------------------------------------------------------------
 st.header("Inferencia corte por corte")
+plano = st.radio("Plano", inferencia.PLANOS, format_func=inferencia.NOMBRE_PLANO.get, horizontal=True,
+                 key="plano_detalle", help="Orientación del corte. Las máscaras son las de la fusión de los tres planos; "
+                                          "las cajas, las del detector del plano elegido.")
 st.markdown(" &nbsp; ".join(f"<span style='color:{colores[c]}'>&#9632;</span> {inferencia.NOMBRE_REGION[r]}"
                             for c, r in regiones.items()), unsafe_allow_html=True)
 
@@ -216,13 +213,13 @@ def visor_cortes():
     ver_ref = ref is not None and st.toggle("Ver la referencia en lugar de la predicción", key="ver_referencia")
     inst = ref["volumen"] if ver_ref else res["instance_volume"]
     n = inferencia.planos.n_slices(inst.shape, plano)
-    if "pixeles" not in dp:
-        dp["pixeles"] = vis.pixeles_por_corte(res["instance_volume"], plano)
-    pixeles = dp["pixeles"]
+    if f"pixeles_{plano}" not in dp:
+        dp[f"pixeles_{plano}"] = vis.pixeles_por_corte(res["instance_volume"], plano)
+    pixeles = dp[f"pixeles_{plano}"]
     inicio = int(pixeles.argmax()) if pixeles.any() else n // 2
     z = st.slider(f"Corte {inferencia.NOMBRE_PLANO[plano].lower()}", 0, n - 1, inicio, key=f"corte_{plano}")
     gris, etiquetas, volteado = vis.corte_del_plano(pred["gris"], inst, plano, z, spacing)
-    cajas = None if ver_ref else res["cajas"][z]
+    cajas = None if ver_ref else res["cajas"][plano][z]
     if volteado:
         cajas = vis.voltear_cajas(cajas, gris.shape[0])
     izq, _ = st.columns([2, 1])
@@ -244,7 +241,7 @@ def figura(clave, inst, fragmentos, lut_figura):
 
 
 st.header("Reconstrucción 3D")
-vistas = [(f"Predicción ({nombre_modelo})", plano, res["instance_volume"], res["fragmentos"], lut)]
+vistas = [(f"Predicción ({nombre_modelo})", "fusion", res["instance_volume"], res["fragmentos"], lut)]
 if ref is not None:
     vistas.append(("Referencia", f"referencia:{ref['clave']}", ref["volumen"], ref["fragmentos"], ref["lut"]))
 for pestana, (_, clave, inst, fragmentos, lut_figura) in zip(st.tabs([v[0] for v in vistas]), vistas):

@@ -1,12 +1,12 @@
 """
-evidencias_nms.py -- Evidencia del NMS propio por clase (PENGWIN, semana 10). Autor: Fabián.
+evidencias_nms.py -- Evidencia del NMS propio por clase (PENGWIN, semana 10).
 
 QUÉ HACE
   1. logits_oraculo: fabrica salidas de la cabeza grid [B, 8, 16, 16] A PARTIR DE LAS CAJAS REALES,
      imitando los errores típicos de un detector grid: la celda del centro acierta, las celdas vecinas
      repiten la misma caja un poco corrida (duplicados) y aparecen algunos falsos positivos de bajo score.
      NO es un modelo ni mide desempeño: sirve para comprobar que el mecanismo NMS hace lo que debe
-     mientras el modelo entrenado de Miguel no está listo.
+     mientras el modelo entrenado no está listo.
   2. metricas_deteccion: AP por clase, mAP@0.50, mAP@[0.50:0.95], IoU medio, FP y FN.
   3. barrido_nms: compara "sin NMS" contra varias configuraciones de NMS (iou_thresh, max_det_per_class).
   4. figura_antes_despues: cajas de un corte antes y después del NMS.

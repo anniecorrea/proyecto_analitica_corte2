@@ -30,7 +30,8 @@ if (-not (Test-Path $Streamlit)) {
     throw "No encuentro .venv\Scripts\streamlit.exe. Crea el ambiente: python -m venv .venv; .venv\Scripts\python -m pip install -r requirements.txt"
 }
 foreach ($plano in "axial", "coronal", "sagital") {
-    $modelo = Join-Path $Raiz "resultados\modelos\entrenamiento_multitarea_$plano\modelo_multitarea_$plano.pt"
+    # la app fusiona los tres planos con los modelos de la etapa B
+    $modelo = Join-Path $Raiz "resultados\modelos\entrenamiento_multitarea_$plano\modelo_multitarea_${plano}_B.pt"
     if (-not (Test-Path $modelo) -or (Get-Item $modelo).Length -lt 1MB) {
         throw "Falta $modelo o es un puntero de Git LFS. Ejecuta: git lfs install; git lfs pull"
     }

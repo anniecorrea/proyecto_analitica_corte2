@@ -1,30 +1,3 @@
-"""
-cortes_vacios.py -- Cortes sin pelvis: manifiesto de negativos, métricas sobre el volumen completo,
-regla de selección del ajuste fino y filtro opcional de tramo principal en z (PENGWIN, semana 10).
-
-POR QUÉ EXISTE
-  El modelo multitarea se entrenó solo con cortes que tienen pelvis (manifest_cortes_positivos.csv). En un
-  volumen completo, los cortes de arriba y de abajo (fémures, columna) reciben cajas. En val, con el modelo
-  2.5D, 229 de 394 cortes sin pelvis tienen alguna caja y 212 pasan el umbral_corte de 0,08 (con el modelo
-  anterior, de un corte, eran 310 y 190 con 0,45). Ninguna métrica actual lo ve, porque todas se calculan sobre cortes positivos.
-
-QUÉ HAY AQUÍ (todo NumPy/pandas, sin torch: se prueba sin GPU)
-  perfil_cortes              -> por corte: vóxeles de pelvis, si la tiene, distancia a la pelvis y posición.
-  manifiesto_negativos       -> cortes SIN un solo vóxel de pelvis, por split (entran al ajuste fino).
-  submuestrear_negativos     -> fracción reproducible de negativos, por caso (no se concentra en pocos casos).
-  calibrar_umbral            -> misma regla que pipeline_pengwin.calibrar_umbral_corte (probada contra ella).
-  metricas_cortes_vacios     -> recall de pelvis, cortes vacíos que pasan y cortes vacíos con alguna caja.
-  resumen_cortes_vacios      -> lo anterior con umbral calibrado y con un umbral fijo (comparación justa).
-  criterio_seleccion         -> regla escrita ANTES de entrenar para elegir época y configuración.
-  tramo_principal            -> filtro opcional en z; solo se adopta si mejora en val (ver notebook).
-
-CONVENCIONES
-  * "tiene pelvis" = el label del corte tiene al menos un vóxel con ID 1..30 (igual que nms_pertenencia_pipeline).
-  * Un corte "se procesa" si tiene alguna caja final y su mejor score >= umbral (igual que
-    pipeline_pengwin._corte_procesado). Score 0 significa "sin cajas después del NMS".
-  * Los cortes con muy poca pelvis (menos de 20 píxeles tras el letterbox) no están en el manifiesto de
-    positivos; tampoco entran como negativos porque sí tienen pelvis. Quedan fuera del ajuste, a propósito.
-"""
 import numpy as np
 import pandas as pd
 

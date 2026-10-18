@@ -1,20 +1,19 @@
 """
 pipeline_pengwin.py -- Unión detección -> NMS -> segmentación de instancia -> pertenencia (PENGWIN, semana 10).
-Autor: Fabián.
 
 FLUJO POR CORTE (inferir_cortes)
   imagen [B,C,256,256]   (C = 1, o 3 con entrada 2.5D: cortes z-1, z, z+1)
-    -> backbone (pirámide f1..f4) -> CBAM/compuerta sobre f4                     (Miguel / Annie)
-    -> cabeza grid -> decode_predictions (raw) -> nms_por_clase (final)          (Fabián)
-    -> priors de región con las cajas FINALES -> decoder de instancias           (Annie)
-    -> IDs de instancia por corte -> PertenenciaHead sobre f4 -> clase por instancia   (Fabián)
+    -> backbone (pirámide f1..f4) -> CBAM/compuerta sobre f4
+    -> cabeza grid -> decode_predictions (raw) -> nms_por_clase (final)
+    -> priors de región con las cajas FINALES -> decoder de instancias
+    -> IDs de instancia por corte -> PertenenciaHead sobre f4 -> clase por instancia
   Durante la inferencia NO se usa ninguna anotación real.
 
 FLUJO POR VOLUMEN (inferir_volumen)
   MHA (z, y, x) en HU -> preprocesamiento por corte -> inferir_cortes por lotes
     -> restaurar máscaras a la cuadrícula original -> asociar instancias entre cortes (IDs 3D)
     -> pertenencia 3D = promedio de probabilidades por corte ponderado por área
-    -> instance_volume + region_by_id: entrada directa de measure_fragment_separations (Daniela).
+    -> instance_volume + region_by_id: entrada directa de measure_fragment_separations (src/distancias_fragmentos.py).
 
 POR QUÉ RECIBE FUNCIONES COMO PARÁMETROS
   Las funciones de segmentación viven en el notebook (sección 23). En vez de copiarlas (dos versiones del
@@ -31,17 +30,6 @@ POR QUÉ RECIBE FUNCIONES COMO PARÁMETROS
         "preprocess_fn": preprocesar_corte,               # HU -> ventaneo -> CLAHE -> letterbox (solo volumen)
         "in_channels": 1,                                 # opcional: 3 si el modelo usa entrada 2.5D (solo volumen)
     }
-
-REGLAS DOCUMENTADAS
-  * Clase final de una instancia = argmax de la cabeza de pertenencia. Si no coincide con la clase semántica
-    del decoder o con la de la caja que la contiene, se marca conflicto; NO se corrige en silencio.
-  * Una instancia que no cae dentro de ninguna caja final se CONSERVA y se marca sin_caja (no se borran
-    fragmentos reales para que la salida se vea mejor).
-  * Toda salida vacía conserva su forma: cajas [0,4], máscaras en ceros, listas vacías. Nunca None.
-  * Filtro de cortes (opcional, `umbral_corte`): el modelo se entrenó solo con cortes que tienen hueso pélvico. Al
-    recorrer un volumen completo, un corte cuya mejor caja después del NMS no llega a `umbral_corte` se marca
-    `procesado=False` y NO pasa por el decoder: sale sin instancias. Con `umbral_corte=None` (por defecto) se
-    procesan todos los cortes. El umbral se calibra con `val` (`calibrar_umbral_corte`), nunca con `test`.
 """
 import numpy as np
 import pandas as pd
@@ -54,7 +42,7 @@ from src.pertenencia import NOMBRES, clase_de_id, clasificar_instancias, instanc
 CONFIG_PIPELINE = {
     "score_thresh": 0.05,                 # candidatas mínimas que salen del grid
     **NMS_CONFIG,                         # iou_thresh, max_det_per_class
-    "center_threshold": 0.25,             # decoder de Annie (elegir con val)
+    "center_threshold": 0.25,             # decoder de instancias (elegir con val)
     "min_center_distance": 7,
     "min_instance_pixels": 1,             # no se borran fragmentos pequeños
     "output_size": (256, 256),

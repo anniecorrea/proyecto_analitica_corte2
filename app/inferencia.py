@@ -1,5 +1,11 @@
 """Inferencia del frontend: un MHA -> fragmentos 3D con los tres modelos por plano (axial, coronal y sagital).
 
+El frontend usa la FUSIÓN 3D de los tres planos (predecir_fusion, con cargar_pipeline(fusion=True)): los modelos de la
+etapa B infieren probabilidades en sus planos, se promedian y los fragmentos son los componentes conexos 3D de cada hueso.
+Es la variante validada en test por notebooks/Test_final_fusion_B.ipynb (Dice 3D 0.973 frente a 0.958 del mejor plano
+solo). predecir_plano (un plano, modelos finales de la etapa C y la salida 3D de salida_3d.ipynb) queda para los scripts
+de evaluación de src/.
+
 Los modelos salen de Entrenamiento_multitarea_planos.ipynb: cada uno se entrenó sobre volúmenes en orientación canónica
 (LPS, src/orientacion.py) cortados a lo largo de su plano (src/planos.py), con entrada 2.5D (cortes i-1, i, i+1) y, en el
 sagital, un 4.º canal con la posición lateral del corte. La inferencia reproduce ese preprocesamiento:
@@ -39,6 +45,10 @@ warnings.filterwarnings("ignore", message="'mode' parameter is deprecated")   # 
 PLANOS = ("axial", "coronal", "sagital")
 NOMBRE_PLANO = {"axial": "Axial", "coronal": "Coronal", "sagital": "Sagital"}
 MODELOS = {p: MODELOS_DIR / f"entrenamiento_multitarea_{p}" / f"modelo_multitarea_{p}.pt" for p in PLANOS}
+# Fusión 3D de los tres planos (la del frontend): modelos al final de la etapa B, como en notebooks/Test_final_fusion_B.ipynb
+MODELOS_FUSION = {p: MODELOS_DIR / f"entrenamiento_multitarea_{p}" / f"modelo_multitarea_{p}_B.pt" for p in PLANOS}
+MIN_MM3_FRAGMENTO = 500          # piezas 3D más pequeñas se descartan (valor congelado del test de la fusión)
+LOTE_FUSION = 24                 # cortes por pasada en la fusión (FUSION_BATCH del cuaderno)
 CONFIG_3D_PATH = METRICAS_DIR / "salida_3d" / "config_3d.json"
 ETIQUETAS_DIR = DATA_MHA_DIR / "PENGWIN_CT_train_labels"
 
@@ -80,13 +90,17 @@ def _componentes(ns, ruta):
         module.load_state_dict({k[len(name) + 1:]: v for k, v in state.items() if k.startswith(name + ".")})
         module.to(ns["DEVICE"]).eval()
     comp = {**parts, "features_fn": ns["backbone_feature_pyramid"], "in_channels": n_in, "image_channels": n_img,
-            "posicion": bool((arch.get("position") or {}).get("enabled", False)), "plano": arch.get("plane")}
+            "posicion": bool((arch.get("position") or {}).get("enabled", False)), "plano": arch.get("plane"),
+            "pred_box_score_min": float(payload.get("inference_defaults", {}).get("pred_box_score_min", 0.05))}
     return comp, payload
 
 
-def cargar_pipeline():
-    """Namespace con las definiciones de los cuadernos + los tres modelos por plano + configuración 3D congelada."""
-    for plano, ruta in MODELOS.items():
+def cargar_pipeline(fusion=False):
+    """Namespace con las definiciones de los cuadernos + los tres modelos por plano + configuración 3D congelada.
+    fusion=True carga los modelos de la etapa B (los de la fusión 3D del frontend); por defecto, los modelos finales de
+    cada plano (etapa C), con los que se hicieron la evaluación y los scripts de src/."""
+    rutas_modelos = MODELOS_FUSION if fusion else MODELOS
+    for plano, ruta in rutas_modelos.items():
         if not ruta.is_file() or ruta.stat().st_size < 1024:
             raise FileNotFoundError(f"No encuentro los pesos del modelo {plano} en {ruta}. Si el archivo es un puntero "
                                     "de Git LFS, ejecuta `git lfs pull`.")
@@ -95,7 +109,7 @@ def cargar_pipeline():
     cargar_definiciones(cuadernos, DEFINICIONES_EQUIPO, VALORES_EQUIPO, destino=ns)
     exec("from cbam_modulos import CBAM, CompuertaResidualCBAM", ns)
     cargar_definiciones(NOTEBOOKS_DIR / "salida_3d.ipynb", DEFINICIONES_SALIDA_3D, VALORES_SALIDA_3D, destino=ns)
-    exec("from deteccion_grid import GridDetectionHead, postprocess, nms_por_clase", ns)
+    exec("from deteccion_grid import GridDetectionHead, decode_predictions, postprocess, nms_por_clase", ns)
     # PENGWIN_DEVICE: auto (GPU si hay, si no CPU; por defecto) | cpu | cuda. El servicio de AWS fija cpu; en local se
     # puede forzar cpu para ver lo mismo que el servidor. AMP solo en GPU.
     pedido = os.environ.get("PENGWIN_DEVICE", "auto").strip().lower()
@@ -108,7 +122,7 @@ def cargar_pipeline():
         ns["AMP"] = ns["DEVICE"].type == "cuda"
 
     modelos, info = {}, {}
-    for plano, ruta in MODELOS.items():
+    for plano, ruta in rutas_modelos.items():
         comp, payload = _componentes(ns, ruta)
         if comp["plano"] not in (None, plano):
             raise ValueError(f"{ruta.name} es un modelo {comp['plano']}, no {plano}.")
@@ -118,7 +132,7 @@ def cargar_pipeline():
                        "canales_entrada": comp["in_channels"]}
     cfg_3d, meta_3d = ns["load_config_3d"](CONFIG_3D_PATH)
     return {"ns": ns, "modelos": modelos, "cfg_3d": cfg_3d, "info": info, "dispositivo": str(ns["DEVICE"]),
-            "config_3d_creada": meta_3d.get("creado")}
+            "config_3d_creada": meta_3d.get("creado"), "fusion": bool(fusion)}
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -306,6 +320,183 @@ def cajas_por_corte(bundle, det_gate):
         salida.append({"boxes": boxes, "labels": det["labels"][keep].astype(int), "scores": det["scores"][keep]}
                       if keep.any() else None)
     return salida
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Fusión 3D de los tres planos (la reconstrucción del frontend)
+# ---------------------------------------------------------------------------------------------------------------
+# Reproduce notebooks/Test_final_fusion_B.ipynb (sección 2, `inferir_volumen` / `fusion_3d`), la variante evaluada en test:
+# modelos de la etapa B, probabilidades de los tres planos promediadas con pesos iguales, argmax, fragmentos = componentes
+# conexos 3D de cada hueso (26 vecinos) de al menos MIN_MM3_FRAGMENTO mm³.
+#   1. Cada modelo recorre TODOS los cortes de su plano. El decoder recibe como prior la mejor caja de cada clase con score
+#      >= pred_box_score_min (make_priors "pred" del entrenamiento) y devuelve la probabilidad de sacro / coxal izq. /
+#      coxal der., que se lleva a la forma original del corte (deshace letterbox y píxeles cuadrados).
+#   2. Las probabilidades (uint8) de los tres planos se SUMAN en un acumulador uint16: así nunca hay tres volúmenes a la vez.
+#   3. Clase de cada vóxel = argmax de [fondo, sacro, coxal izq., coxal der.] con fondo = 255·planos − suma (lo mismo que
+#      el promedio del cuaderno, multiplicado por el número de planos).
+# Las cajas del detector (con NMS) se guardan solo para dibujarlas y para el control de "pelvis presente".
+def _como_en_cache(img):
+    """La caché de entrenamiento guardaba las imágenes en float16: la red ve lo mismo que vio al entrenar."""
+    return np.asarray(img, dtype=np.float16).astype(np.float32)
+
+
+def _cajas_top1(decodificado, score_min):
+    """La caja de mayor score de cada clase si supera score_min (predicted_boxes_top1 del entrenamiento)."""
+    boxes, labels = [], []
+    for c in (1, 2, 3):
+        idx = (decodificado["labels"] == c).nonzero(as_tuple=True)[0]
+        if len(idx) == 0:
+            continue
+        j = idx[decodificado["scores"][idx].argmax()]
+        if float(decodificado["scores"][j]) >= score_min:
+            boxes.append(decodificado["boxes"][j].detach().cpu().numpy())
+            labels.append(c)
+    return {"boxes": np.asarray(boxes, dtype=np.float32).reshape(-1, 4), "labels": np.asarray(labels, dtype=np.int64)}
+
+
+def _restaurar_probs(p, forma_cuadrada, forma_original, size):
+    """[3, 256, 256] uint8 -> [3, *forma_original]: quita el relleno del letterbox y remuestrea (bilineal)."""
+    from PIL import Image
+    h, w = forma_cuadrada
+    escala = min(size / w, size / h)
+    nw, nh = max(1, int(round(w * escala))), max(1, int(round(h * escala)))
+    ox, oy = (size - nw) // 2, (size - nh) // 2
+    out = np.empty((p.shape[0],) + tuple(forma_original), dtype=np.uint8)
+    for c in range(p.shape[0]):
+        recorte = np.ascontiguousarray(p[c, oy:oy + nh, ox:ox + nw], dtype=np.float32)
+        grande = Image.fromarray(recorte).resize((int(forma_original[1]), int(forma_original[0])),
+                                                 Image.Resampling.BILINEAR)
+        out[c] = np.clip(np.rint(np.asarray(grande, dtype=np.float32)), 0, 255).astype(np.uint8)
+    return out
+
+
+@torch.no_grad()
+def inferir_probabilidades(pipeline, plano, volume, spacing, acumulado, progreso=None, lote=None):
+    """Suma en `acumulado` ([3, z, y, x] uint16) las probabilidades de las 3 clases del modelo de ese plano.
+    Devuelve las detecciones por corte (con NMS) para el control de pelvis y para dibujar las cajas.
+    lote: cortes por pasada (por defecto LOTE_FUSION; 1 para medir la latencia por imagen)."""
+    tamano_lote = lote or LOTE_FUSION
+    ns, comp, cfg = pipeline["ns"], pipeline["modelos"][plano], pipeline["ns"]["CFG_SLICE"]
+    device, amp, size = ns["DEVICE"], ns["AMP"], ns["IMAGE_SIZE"]
+    n = planos.n_slices(volume.shape, plano)
+    forma = planos.get_slice(volume, plano, 0).shape
+    cuadrada = planos.square_shape(forma, *planos.plane_spacing(plano, spacing), spacing[0])
+    fov = planos.fov_center_mm(volume.shape, spacing)        # línea media en inferencia: centro del campo de visión
+    hechos, dets, transform = {}, [None] * n, None
+
+    def preparado(k):
+        if k not in hechos:
+            img, tf = _preparar_corte(ns, volume, plano, k, spacing)
+            hechos[k] = (_como_en_cache(img), tf)
+        return hechos[k]
+
+    for start in range(0, n, tamano_lote):
+        indices = list(range(start, min(n, start + tamano_lote)))
+        lote = []
+        for i in indices:
+            canales = [preparado(k)[0] for k in planos.neighbor_indices(i, n, comp["image_channels"])]
+            if comp["posicion"]:
+                canales.append(planos.position_channel(planos.slice_position_mm(plano, i, spacing), fov, size))
+            lote.append(np.stack(canales))
+        transform = transform or preparado(indices[0])[1]
+        for k in [k for k in hechos if k < start - 1]:
+            del hechos[k]
+        x = torch.from_numpy(np.stack(lote).astype(np.float32)).to(device)
+        with torch.autocast(device_type=device.type, enabled=amp):
+            feats = ns["trunk_features"](comp, x)
+            det_out = comp["det_head"](feats[-1])
+        con_nms = ns["postprocess"](det_out.float(), score_thresh=cfg["det_score_min"], nms_fn=ns["nms_por_clase"],
+                                    iou_thresh=cfg["nms_iou"], max_det_per_class=cfg["max_det_per_class"])
+        for i, d in enumerate(con_nms):
+            dets[indices[i]] = {k: d[k].detach().cpu().numpy() for k in ("boxes", "scores", "labels")}
+        decodificadas = ns["decode_predictions"](det_out.float(), score_thresh=0.0, img_size=size)
+        priors = ns["build_detection_region_priors"](
+            [_cajas_top1(d, comp["pred_box_score_min"]) for d in decodificadas], output_size=(size, size), device=device)
+        with torch.autocast(device_type=device.type, enabled=amp):
+            # el decoder recibe solo los canales de imagen (sin el canal de posición del sagital)
+            seg = comp["seg_decoder"](x[:, :comp["image_channels"]], feats, priors)
+        p = torch.softmax(seg["semantic_logits"].float(), dim=1)[:, 1:]
+        p = (p * 255.0).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
+        for j, i in enumerate(indices):
+            atras = _restaurar_probs(p[j], cuadrada, forma, size)
+            for c in range(3):
+                planos.get_slice(acumulado[c], plano, i)[...] += atras[c]      # vista del acumulador: suma en el sitio
+        if progreso is not None:
+            progreso(indices[-1] + 1, n)
+    return {"dets": dets, "transform": transform}
+
+
+def _caja_3d(mascara, margen=2):
+    idx = [np.flatnonzero(mascara.any(axis=tuple(a for a in range(3) if a != eje))) for eje in range(3)]
+    if any(len(i) == 0 for i in idx):
+        return None
+    return tuple(slice(max(0, int(i[0]) - margen), int(i[-1]) + 1 + margen) for i in idx)
+
+
+def fragmentos_desde_clases(clases, spacing, min_mm3=MIN_MM3_FRAGMENTO):
+    """Volumen de clases 0-3 -> (instancias uint16 numeradas 1..N, {id: clase}). Cada fragmento es un componente conexo
+    (26 vecinos) de un hueso; se descartan los de menos de min_mm3 (instancias_desde_cc del cuaderno de la fusión)."""
+    from scipy import ndimage
+    inst = np.zeros(clases.shape, dtype=np.uint16)
+    clase_de, n = {}, 0
+    caja = _caja_3d(clases > 0)
+    if caja is None:
+        return inst, clase_de
+    sub, sub_inst = clases[caja], inst[caja]
+    min_vox = max(1, int(np.ceil(min_mm3 / float(np.prod(spacing))))) if min_mm3 else 1
+    for c in (1, 2, 3):
+        cc, _ = ndimage.label(sub == c, structure=np.ones((3, 3, 3), dtype=bool))
+        tamanos = np.bincount(cc.ravel())
+        for comp_id in np.flatnonzero(tamanos >= min_vox):
+            if comp_id == 0:
+                continue
+            n += 1
+            sub_inst[cc == comp_id] = n
+            clase_de[n] = c
+        del cc
+    return inst, clase_de
+
+
+def predecir_fusion(pipeline, volume, spacing, case_id="subido", progreso=None):
+    """Los tres planos -> fragmentos 3D fusionados en el volumen canónico + tabla con distancias. No usa etiquetas.
+    Misma salida que predecir_plano; además, "cajas" y el control de pelvis por plano."""
+    if not pipeline.get("fusion"):
+        raise ValueError("La fusión usa los modelos de la etapa B: cargar el pipeline con cargar_pipeline(fusion=True).")
+    ns, det_gate = pipeline["ns"], pipeline["cfg_3d"]["decode"]["det_gate"]
+    t0 = time.time()
+    acumulado = np.zeros((3,) + tuple(volume.shape), dtype=np.uint16)
+    total, hechos = sum(planos.n_slices(volume.shape, p) for p in PLANOS), 0
+    cajas, pelvis_planos = {}, {}
+    for plano in PLANOS:
+        aviso = None if progreso is None else (lambda k, n, base=hechos, pl=plano: progreso(base + k, total, pl))
+        bundle = inferir_probabilidades(pipeline, plano, volume, spacing, acumulado, aviso)
+        hechos += planos.n_slices(volume.shape, plano)
+        pelvis_planos[plano] = control_pelvis.pelvis_presente_bundle(bundle, planos.slice_axis_spacing(plano, spacing))
+        cajas[plano] = cajas_por_corte(bundle, det_gate)
+        del bundle
+    # Control de "pelvis presente" (src/control_pelvis.py) en cada plano; hay pelvis si lo dice la mayoría (2 de 3).
+    presente = sum(p["presente"] for p in pelvis_planos.values()) >= 2
+    clases = np.zeros(volume.shape, dtype=np.uint8)
+    if presente:
+        tope = 255 * len(PLANOS)
+        for z0 in range(0, volume.shape[0], 32):
+            a = acumulado[:, z0:z0 + 32].astype(np.int32)
+            clases[z0:z0 + 32] = np.concatenate([(tope - a.sum(0))[None], a], axis=0).argmax(0).astype(np.uint8)
+    del acumulado
+    inst, clase_de = fragmentos_desde_clases(clases, spacing) if presente else (np.zeros(volume.shape, np.uint16), {})
+    del clases
+    ids = np.arange(1, len(clase_de) + 1)
+    n_vox = np.bincount(inst.ravel(), minlength=len(clase_de) + 1)[1:] if len(clase_de) else np.zeros(0, int)
+    tabla = pd.DataFrame({"fragment_id": ids, "class": [clase_de[int(i)] for i in ids],
+                          "n_voxels": n_vox, "n_slices": np.nan, "mean_score": np.nan})
+    tabla["region"] = tabla["class"].map(ns["REGION_OF_CLASS"])
+    tabla["volumen_cm3"] = tabla["n_voxels"] * float(np.prod(spacing)) / 1000.0
+    region_by_id = {int(f): ns["REGION_OF_CLASS"][int(c)] for f, c in zip(tabla["fragment_id"], tabla["class"])}
+    tabla = _con_distancias(tabla, inst, spacing, case_id, region_by_id)
+    sin_pelvis = {p: [None] * len(c) for p, c in cajas.items()}
+    return {"plano": "fusion", "instance_volume": inst.astype(np.uint8) if inst.max() < 256 else inst,
+            "region_by_id": region_by_id, "fragmentos": tabla, "cajas": cajas if presente else sin_pelvis,
+            "pelvis": {"presente": presente, "por_plano": pelvis_planos}, "segundos": time.time() - t0}
 
 
 # ---------------------------------------------------------------------------------------------------------------

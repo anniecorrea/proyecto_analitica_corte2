@@ -1,5 +1,5 @@
 """
-pertenencia.py -- Cabeza de clasificación por pertenencia anatómica (PENGWIN, semana 10). Autor: Fabián.
+pertenencia.py -- Cabeza de clasificación por pertenencia anatómica (PENGWIN, semana 10).
 
 QUÉ RESUELVE
   La consigna exige una TERCERA cabeza sobre el backbone compartido que asigne cada instancia (fragmento)
@@ -19,19 +19,6 @@ CÓMO FUNCIONA (por instancia)
      ancho, alto y raíz del área. La posición es la pista clave para izquierdo/derecho: los dos coxales
      son casi simétricos y la textura sola no los distingue.
   5. MLP -> 3 logits (0 = sacro, 1 = coxal izquierdo, 2 = coxal derecho; label = índice + 1).
-
-ADVERTENCIA PARA EL ENTRENAMIENTO (Miguel)
-  Un flip horizontal como aumento de datos intercambia izquierdo y derecho: si se usa, hay que
-  intercambiar también las etiquetas 2 <-> 3 (IDs 11-20 <-> 21-30). Si no, la cabeza aprende ruido.
-
-CONTRATO
-  head = PertenenciaHead()
-  masks, batch_idx, labels = targets_pertenencia(instance_masks)   # instance_masks: lista de [H,W] con IDs 1..30
-  logits = head(f4, masks, batch_idx)                              # [K, 3]
-  loss = perdida_pertenencia(logits, labels)                       # escalar; 0 conectado al grafo si K = 0
-  La cabeza NO entra en la pérdida conjunta: se entrena aparte, con el tronco congelado (etapa D;
-  src/entrenar_pertenencia_planos.py), así que no hay un peso λ_cls que calibrar.
-  En entrenamiento las máscaras son las REALES (teacher forcing); en inferencia, las que predice el decoder.
 """
 import numpy as np
 import torch
@@ -281,7 +268,7 @@ def metricas_pertenencia(y_true, probs=None, y_pred=None):
 
 
 # --------------------------------------------------------------------------------------------------
-# Etapa D: entrenar SOLO la cabeza sobre el tronco entrenado y congelado (backbone + CBAM de Miguel)
+# Etapa D: entrenar SOLO la cabeza sobre el tronco entrenado y congelado (backbone + CBAM)
 # --------------------------------------------------------------------------------------------------
 # Por qué así: el tronco ya aprendió en las etapas A-C; congelarlo y entrenar solo esta cabeza es el mismo
 # esquema por etapas que la etapa B (solo decoder). Como el tronco no cambia, f4 se calcula UNA vez por corte

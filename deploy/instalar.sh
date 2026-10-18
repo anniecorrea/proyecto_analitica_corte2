@@ -15,9 +15,10 @@ SWAP_GB="${SWAP_GB:-4}"
 PYTHON_VERSION="3.12"                     # la versión con la que se probó requirements-app.txt
 DIR="$HOME/proyecto_analitica_corte2"
 
-# Solo los archivos de Git LFS que usa app/inferencia.py. Bajar todos (~600 MB, SAM incluido) gasta la cuota
-# mensual de LFS de GitHub y el disco del servidor sin necesidad.
-LFS_INCLUIR="resultados/modelos/entrenamiento_multitarea_axial/modelo_multitarea_axial.pt,resultados/modelos/entrenamiento_multitarea_coronal/modelo_multitarea_coronal.pt,resultados/modelos/entrenamiento_multitarea_sagital/modelo_multitarea_sagital.pt"
+# Solo los archivos de Git LFS que usa app/inferencia.py: los tres modelos de la etapa B, con los que el frontend fusiona
+# los tres planos en 3D (cargar_pipeline(fusion=True)). Bajar todos (~600 MB, SAM incluido) gasta la cuota mensual de LFS
+# de GitHub y el disco del servidor sin necesidad.
+LFS_INCLUIR="resultados/modelos/entrenamiento_multitarea_axial/modelo_multitarea_axial_B.pt,resultados/modelos/entrenamiento_multitarea_coronal/modelo_multitarea_coronal_B.pt,resultados/modelos/entrenamiento_multitarea_sagital/modelo_multitarea_sagital_B.pt"
 
 echo "== Paquetes del sistema"
 sudo apt-get update -y
@@ -40,6 +41,12 @@ if [ ! -d "$DIR/.git" ]; then
 else
     git -C "$DIR" fetch --depth 1 origin "$RAMA"
     GIT_LFS_SKIP_SMUDGE=1 git -C "$DIR" checkout -B "$RAMA" FETCH_HEAD
+fi
+# Si la actualización trajo una versión distinta de este script (p. ej. otra lista de modelos en LFS_INCLUIR), se
+# ejecuta la nueva desde el principio: la que está corriendo ya leyó sus variables y descargaría los modelos anteriores.
+if [ -z "${PENGWIN_REEJECUTADO:-}" ] && ! cmp -s "${BASH_SOURCE[0]:-$0}" "$DIR/deploy/instalar.sh" 2>/dev/null; then
+    echo "== instalar.sh cambió con la actualización: se ejecuta la versión nueva"
+    PENGWIN_REEJECUTADO=1 exec bash "$DIR/deploy/instalar.sh"
 fi
 git -C "$DIR" lfs pull --include="$LFS_INCLUIR"
 

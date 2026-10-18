@@ -1,19 +1,4 @@
-"""Ablación con/sin CBAM y con/sin transfer learning (consigna, informe técnico) y exportación de los modelos de la etapa B.
-
-Ejecuta las celdas de notebooks/Entrenamiento_multitarea_planos.ipynb (menos la última, la que entrena los tres planos)
-en un espacio de nombres propio y cambia solo lo que define cada variante. Todo lo demás (datos, cachés, semilla,
-pérdidas, épocas, selección de checkpoint) es exactamente el entrenamiento de los modelos en uso.
-
-- Solo etapas A y B (10 + 10 épocas): en validación la etapa C casi no mejora a B (+0.004 mAP@0.50 y +0.004 Dice en
-  el axial), así que la ablación se compara al final de B. La base de la comparación es el best_B_decoder.pth del modelo
-  axial en uso (con CBAM y sin transfer learning): mismo protocolo, no hace falta volver a entrenarla.
-- Solo el plano axial: es el de menor costo (unos 95 min por corrida hasta B). CBAM y el backbone son iguales en los
-  tres planos.
-- Transfer learning: el backbone arranca con los pesos de src/preentrenar_backbone_pets.py; detección, decoder y
-  pertenencia se entrenan desde cero.
-- Cada variante escribe en entrenamiento_multitarea_axial_ablacion_{variante}/ (métricas, modelos y figuras): los
-  modelos que usa la app no se tocan.
-
+"""
 Desde la raíz del repositorio:
 
     python -m src.ablacion entrenar --variante sin_cbam --prueba     # prueba corta (minutos) para detectar errores

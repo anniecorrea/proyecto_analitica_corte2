@@ -1,25 +1,4 @@
-"""entrenar_pertenencia_planos.py -- Etapa D (cabeza de pertenencia) sobre los modelos por plano. Autor: Fabian.
-
-QUE HACE (por cada plano: axial, coronal, sagital)
-  1. Carga el modelo exportado por Entrenamiento_multitarea_planos.ipynb y lo CONGELA (no se toca el tronco).
-  2. Pasa una vez cada corte de train y de val por el tronco (backbone + CBAM) y guarda f4 en memoria.
-  3. Entrena SOLO la cabeza de pertenencia sobre ese f4 con las mascaras reales (teacher forcing), elige la
-     mejor epoca por F1 macro en val y guarda:
-       resultados/modelos/nms_pertenencia/cabeza_pertenencia_{plano}.pt   (+ _meta.json con el hash del tronco)
-       resultados/metricas/nms_pertenencia/historial_etapa_D_{plano}.csv
-
-POR QUE ASI
-  Es el esquema por etapas que recomendo el profesor: el extractor ya aprendio en las etapas A-C; se congela y se
-  entrena solo la cabeza nueva. Como el tronco no cambia, f4 se calcula una sola vez y cada epoca solo pasa por la
-  cabeza: la parte cara es el paso 2 (GPU recomendada), el entrenamiento en si toma segundos por epoca.
-
-DATOS
-  Los mismos de la evaluacion por planos (src/evaluacion.py): manifiestos y cache del cuaderno de planos.
-  - Si la cache COMPLETA de train del plano ya existe (la deja el entrenamiento), se reutiliza y se toman
-    --max-cortes-train cortes repartidos de forma uniforme. Si no existe, se construye una cache solo con esos
-    cortes (lee los .mha de data_mha/; tarda, pero ocupa mucho menos disco que la completa).
-  - Linea media del sagital (canal de posicion): la de VALIDACION (POS_VAL_MODE del entrenamiento) tambien en
-    train, porque la cabeza ve un f4 fijo calculado una sola vez y en inferencia se usa esa misma linea media.
+"""entrenar_pertenencia_planos.py -- Etapa D (cabeza de pertenencia) sobre los modelos por plano.
 
 USO (desde la raiz del repositorio)
   python -m src.entrenar_pertenencia_planos --plano todos --device cuda

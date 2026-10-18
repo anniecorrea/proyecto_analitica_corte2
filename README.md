@@ -134,6 +134,7 @@ Si quieres ejecutar alguno: ábrelo en VS Code, elige el kernel del `.venv` y pu
 | `nms_pertenencia_pipeline` | NMS por clase y cabeza de pertenencia (a qué hueso pertenece cada fragmento) | GPU |
 | `salida_3d` | Une los cortes en fragmentos 3D y ajusta esa etapa con validación | GPU |
 | `sam_baseline` | Comparación con SAM (modelo general, sin entrenar en este dataset) | GPU |
+| `Test_final_fusion_B` | **Fusión 3D de los tres planos**, la reconstrucción que usa la app: promedia las probabilidades de los modelos de la etapa B y la evalúa en test | GPU |
 
 # Scripts (`src/`)
 
@@ -154,6 +155,7 @@ Los que tienen opciones las muestran con `--help`; `analisis_pesos_cabezas` y `g
 | `python -m src.resumen_ablacion --split test` | Tablas con intervalos de confianza: ablación y etapa C frente a B. Solo lee resultados | CPU |
 | `python -m src.analisis_pesos_cabezas` | Análisis de los pesos entre la detección y la segmentación. Solo lee resultados | CPU |
 | `python -m src.generar_evidencias_distancias` | Figuras de revisión de las distancias de referencia | CPU |
+| `python -m src.evaluar_fusion_3d` | Dice e IoU por fragmento en 3D de la reconstrucción de la app (fusión de los tres planos), en test. Usa las probabilidades que guarda `Test_final_fusion_B` en `resultados/resultados_test_fusion.zip` | CPU |
 | `python -m src.plausibilidad_pelvis referencia` | Rangos de tamaño y proporciones de la pelvis en los pacientes de entrenamiento. La app los usa para advertir cuando una tomografía se sale de lo esperado para una pelvis humana adulta | CPU |
 | `python -m src.plausibilidad_pelvis verificar --predicciones` | Comprueba que la advertencia no salte en los pacientes de validación y prueba, y que sí detecte casos simulados (otro tamaño, lados invertidos, hueso faltante). Sin `--predicciones` usa solo las anotaciones | CPU (con `--predicciones`, GPU recomendada) |
 
@@ -190,11 +192,11 @@ powershell -ExecutionPolicy Bypass -File deploy\local.ps1 -SinTunel
 **Como usar el despliegue**
 
 1. En **Inicio**, sube una tomografía (`.mha`, `.nii` o `.nii.gz`). Puede ser del dataset PENGWIN o una que no pertenezca a él.
-2. Espera el análisis: corre los tres modelos (axial, coronal y sagital). Usa la GPU si la hay y, si no, la CPU.
+2. Espera el análisis: corre los tres modelos (axial, coronal y sagital) y **fusiona sus resultados en 3D**. Usa la GPU si la hay y, si no, la CPU.
 3. Revisa los tres visualizadores:
    - **Volumen crudo:** proyección de máxima intensidad (MIP) con umbral de 300 HU.
-   - **Corte por corte:** mueve el slider para ver las cajas, las máscaras coloreadas por hueso y la distancia de cada fragmento.
-   - **Reconstrucción 3D:** malla interactiva con la distancia en la etiqueta de cada fragmento.
+   - **Corte por corte:** elige el plano y mueve el slider para ver las cajas del detector de ese plano, las máscaras coloreadas por hueso y la distancia de cada fragmento.
+   - **Reconstrucción 3D:** malla interactiva de la fusión de los tres planos, con la distancia en la etiqueta de cada fragmento.
 
 **AWS:** el proyecto también está desplegado en un servidor de AWS EC2 (`deploy/instalar.sh`). Para acceder a esa versión, contacta al dueño de la máquina: [Juan Hoyos](https://github.com/JuanHoyos329).
 

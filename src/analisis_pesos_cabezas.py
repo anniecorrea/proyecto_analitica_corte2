@@ -1,24 +1,3 @@
-"""analisis_pesos_cabezas.py -- Seccion 4.1: pesos entre cabezas (w_det, w_seg) y por que la pertenencia va aparte.
-Autor: Fabian.
-
-No entrena nada: lee lo que ya registro Entrenamiento_multitarea_planos.ipynb para cada plano y resume dos preguntas.
-
-1. QUIEN MUEVE EL TRONCO EN LA ETAPA C (w_det = w_seg = 1)
-   El cuaderno mide, una vez por epoca, la norma del gradiente que cada perdida deja en la primera convolucion del
-   backbone (trunk_grad_det, trunk_grad_seg; un lote fijo de val, en eval). Si una es mucho mayor, esa tarea es la que
-   ajusta el extractor compartido aunque los pesos nominales sean iguales.
-
-2. CUANTO CAMBIA LA ETAPA C LOS RESULTADOS
-   Se compara la mAP@0.50 al final de la etapa A (solo deteccion) y el Dice con priors predichos al final de la etapa
-   B (solo decoder) contra lo mejor de la etapa C (conjunta). Si C apenas mueve las metricas, afinar w_det/w_seg con
-   un barrido (reentrenar C varias veces por plano) tiene poco beneficio para su costo.
-
-Salidas:
-  resultados/metricas/pesos_cabezas/resumen_pesos_cabezas.csv
-  resultados/figuras/pesos_cabezas/normas_gradiente_tronco.png
-
-Uso: python -m src.analisis_pesos_cabezas
-"""
 from __future__ import annotations
 
 import json

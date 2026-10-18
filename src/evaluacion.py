@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import argparse
@@ -63,7 +62,7 @@ def checkpoint_del_plano(plano: str) -> Path:
     return MODELOS_DIR / f"entrenamiento_multitarea_{plano}" / f"modelo_multitarea_{plano}.pt"
 
 
-CABEZAS_DIR = MODELOS_DIR / "nms_pertenencia"   # cabezas de pertenencia (etapa D, Fabian)
+CABEZAS_DIR = MODELOS_DIR / "nms_pertenencia"   # cabezas de pertenencia (etapa D)
 NMS_REFERENCIA = "src.deteccion_grid:nms_por_clase"   # el NMS que usa el sistema (via pipeline_pengwin)
 
 

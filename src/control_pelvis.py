@@ -1,26 +1,3 @@
-"""
-control_pelvis.py -- ¿El estudio tiene una pelvis? Control previo a entregar fragmentos (PENGWIN).
-
-POR QUÉ EXISTE
-  El modelo se entrenó con tomografías de pelvis. Si recibe un estudio sin pelvis (piernas, abdomen, tórax),
-  igual puede marcar huesos parecidos (fémur, columna) y la salida 3D entregaría fragmentos que no existen.
-  En validación, con el modelo original y el filtro de la salida 3D (score >= 0,2):
-    - con pelvis, el modelo se activa en un bloque continuo de 207 a 295 cortes (200 mm o más);
-    - en los tramos sin pelvis, las rachas activas llegan como mucho a 32 cortes (unos 32 mm).
-  Una pelvis completa mide mucho más que eso, así que se exige un bloque continuo de al menos MIN_MM.
-
-REGLA (fijada antes de comparar modelos)
-  Un corte está "activo" si su mejor caja (después del NMS) tiene score >= det_gate (el mismo `det_gate` de
-  config_3d.json). Se busca la racha más larga de cortes activos consecutivos y se mide en milímetros con el
-  espaciado z del header. Hay pelvis si esa racha mide al menos MIN_MM (80 mm).
-
-LIMITACIONES
-  El umbral sale de 5 casos de validación y de tramos sin pelvis cercanos a ella (fémur, columna lumbar).
-  Un estudio que solo traiga una parte pequeña de la pelvis puede ser rechazado: por eso el mensaje dice
-  "no se detectó una pelvis completa". Solo aplica a tomografías 3D, no a una imagen 2D suelta.
-
-Todo es NumPy: se prueba sin GPU (tests/test_control_pelvis.py).
-"""
 import numpy as np
 
 MIN_MM = 80.0
